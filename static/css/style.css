@@ -108,6 +108,7 @@ h2 {
 .badge-eth  { background: rgba(98,126,234,0.15);  color: #627eea; }
 .badge-krw  { background: rgba(63,185,80,0.15);   color: #3fb950; }
 .badge-stock { background: rgba(88,166,255,0.12); color: #58a6ff; }
+.badge-kospi { background: rgba(255,107,107,0.15); color: #ff6b6b; }
 
 .amount-cell { cursor: pointer; font-weight: 600; color: #e6edf3; user-select: none; }
 .amount-cell:hover { color: #58a6ff; text-decoration: underline dotted; }

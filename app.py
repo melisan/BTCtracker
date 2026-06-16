@@ -16,17 +16,24 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 
 STOCKS = {
-    "AAPL": "Apple",
-    "AMZN": "Amazon",
-    "CVX": "Chevron",
-    "LLY": "Eli Lilly",
+    "AAPL":  "Apple",
+    "AMZN":  "Amazon",
+    "CVX":   "Chevron",
+    "LLY":   "Eli Lilly",
     "GOOGL": "Alphabet A",
-    "GOOG": "Alphabet C",
-    "NVO": "Novo Nordisk",
-    "OXY": "Occidental",
+    "GOOG":  "Alphabet C",
+    "NVO":   "Novo Nordisk",
+    "OXY":   "Occidental",
+    "MSTR":  "MicroStrategy",
+    "NVDA":  "NVIDIA",
 }
 
-VALID_TYPES = {"BTC", "ETH", "KRW"} | set(STOCKS.keys())
+KOSPI = {
+    "005930.KS": "Samsung Electronics",
+    "000660.KS": "SK Hynix",
+}
+
+VALID_TYPES = {"BTC", "ETH", "KRW"} | set(STOCKS.keys()) | set(KOSPI.keys())
 
 _price_cache = {"data": None, "ts": 0}
 _stock_cache = {"data": None, "ts": 0}
@@ -123,17 +130,22 @@ def fetch_stock_prices():
     if _stock_cache["data"] and now - _stock_cache["ts"] < STOCK_TTL:
         return _stock_cache["data"]
 
-    prices = {}
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futures = {ex.submit(_fetch_one_stock, t): t for t in STOCKS}
-        for future in as_completed(futures, timeout=15):
+    all_tickers = list(STOCKS.keys()) + list(KOSPI.keys())
+    raw = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(_fetch_one_stock, t): t for t in all_tickers}
+        for future in as_completed(futures, timeout=20):
             try:
                 ticker, price = future.result()
-                prices[ticker] = price
+                raw[ticker] = price
             except Exception:
-                prices[futures[future]] = None
+                raw[futures[future]] = None
 
-    result = {"prices": prices, "updated_at": datetime.utcnow().isoformat()}
+    result = {
+        "prices":       {t: raw.get(t) for t in STOCKS},
+        "kospi_prices": {t: raw.get(t) for t in KOSPI},
+        "updated_at":   datetime.utcnow().isoformat(),
+    }
     _stock_cache["data"] = result
     _stock_cache["ts"] = now
     return result
@@ -145,6 +157,7 @@ def calc_total_krw(holdings, crypto_prices, stock_data=None):
     total = 0
     usd_krw = crypto_prices.get("usd_krw", 1350)
     stock_prices = (stock_data or {}).get("prices", {})
+    kospi_prices = (stock_data or {}).get("kospi_prices", {})
     for h in holdings:
         t = h["asset_type"]
         amt = h["amount"]
@@ -155,8 +168,9 @@ def calc_total_krw(holdings, crypto_prices, stock_data=None):
         elif t == "KRW":
             total += amt
         elif t in STOCKS:
-            usd = stock_prices.get(t) or 0
-            total += amt * usd * usd_krw
+            total += amt * (stock_prices.get(t) or 0) * usd_krw
+        elif t in KOSPI:
+            total += amt * (kospi_prices.get(t) or 0)  # already KRW
     return total
 
 
@@ -192,7 +206,7 @@ def api_prices():
 def api_stocks():
     try:
         data = fetch_stock_prices()
-        return jsonify({**data, "meta": STOCKS})
+        return jsonify({**data, "meta": STOCKS, "kospi_meta": KOSPI})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

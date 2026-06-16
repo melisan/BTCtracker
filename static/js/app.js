@@ -6,7 +6,9 @@ const fmtNum = v => {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: abs >= 1 ? 4 : 8 }).format(v);
 };
 
-const STOCK_TYPES = new Set(["AAPL","AMZN","CVX","LLY","GOOGL","GOOG","NVO","OXY"]);
+const STOCK_TYPES = new Set(["AAPL","AMZN","CVX","LLY","GOOGL","GOOG","NVO","OXY","MSTR","NVDA"]);
+const KOSPI_TYPES = new Set(["005930.KS","000660.KS"]);
+const KOSPI_BADGE = { "005930.KS": "삼성전자", "000660.KS": "SK하이닉스" };
 
 let cryptoPrices = { btc: 0, eth: 0, usd_krw: 1350 };
 let stockData = { prices: {}, meta: {} };
@@ -41,8 +43,10 @@ async function fetchStockPrices() {
     stockData = data;
 
     renderStocksGrid();
-    document.getElementById("stock-ts").textContent =
-      "Updated " + new Date().toLocaleTimeString();
+    renderKospiGrid();
+    const ts = "Updated " + new Date().toLocaleTimeString();
+    document.getElementById("stock-ts").textContent = ts;
+    document.getElementById("kospi-ts").textContent = ts;
 
     renderHoldings(); // refresh KRW values for stock holdings
   } catch (err) {
@@ -69,6 +73,20 @@ function renderStocksGrid() {
   }).join("");
 }
 
+function renderKospiGrid() {
+  const grid = document.getElementById("kospi-grid");
+
+  grid.innerHTML = Object.entries(stockData.kospi_meta || {}).map(([ticker, name]) => {
+    const price = stockData.kospi_prices?.[ticker];
+    const priceKRW = price != null ? fmtKRW.format(price) : '<span class="stock-na">N/A</span>';
+    return `<div class="stock-card">
+      <div class="stock-ticker">${KOSPI_BADGE[ticker] ?? ticker}</div>
+      <div class="stock-name">${name}</div>
+      <div class="stock-price-usd">${priceKRW}</div>
+    </div>`;
+  }).join("");
+}
+
 // ── Holdings ──────────────────────────────────────────────────
 async function fetchHoldings() {
   const res = await fetch("/api/holdings");
@@ -84,6 +102,9 @@ function calcKRW(h) {
   if (STOCK_TYPES.has(t)) {
     const usd = stockData.prices?.[t] ?? 0;
     return h.amount * usd * (cryptoPrices.usd_krw || 1350);
+  }
+  if (KOSPI_TYPES.has(t)) {
+    return h.amount * (stockData.kospi_prices?.[t] ?? 0); // already KRW
   }
   return 0;
 }
@@ -102,13 +123,15 @@ function renderHoldings() {
     const krw = calcKRW(h);
     total += krw;
     const isStock = STOCK_TYPES.has(h.asset_type);
+    const isKospi = KOSPI_TYPES.has(h.asset_type);
     const usdVal = isStock && stockData.prices?.[h.asset_type]
       ? `<span class="usd-sub">${fmtUSD.format(h.amount * stockData.prices[h.asset_type])}</span>` : "";
-    const badgeCls = isStock ? "badge-stock" : `badge-${h.asset_type.toLowerCase()}`;
+    const badgeLabel = isKospi ? (KOSPI_BADGE[h.asset_type] ?? h.asset_type) : h.asset_type;
+    const badgeCls = isKospi ? "badge-kospi" : isStock ? "badge-stock" : `badge-${h.asset_type.toLowerCase()}`;
 
     return `<tr data-id="${h.id}">
       <td>${escHtml(h.label)}</td>
-      <td><span class="badge ${badgeCls}">${h.asset_type}</span></td>
+      <td><span class="badge ${badgeCls}">${badgeLabel}</span></td>
       <td class="amount-cell" data-id="${h.id}" data-amount="${h.amount}">${fmtNum(h.amount)}</td>
       <td class="krw-val">${fmtKRW.format(krw)}${usdVal}</td>
       <td><button class="btn-del" data-id="${h.id}" title="Delete">✕</button></td>

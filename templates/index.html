@@ -50,6 +50,17 @@
     </div>
   </section>
 
+  <!-- KOSPI -->
+  <section class="card">
+    <div class="card-header">
+      <h2>KOSPI</h2>
+      <span id="kospi-ts" class="ts"></span>
+    </div>
+    <div id="kospi-grid" class="stocks-grid">
+      <div class="stock-loading">Loading KOSPI prices…</div>
+    </div>
+  </section>
+
   <!-- Holdings -->
   <section class="card">
     <div class="card-header">
@@ -89,6 +100,12 @@
           <option value="GOOG">GOOG — Alphabet C</option>
           <option value="NVO">NVO — Novo Nordisk</option>
           <option value="OXY">OXY — Occidental</option>
+          <option value="MSTR">MSTR — MicroStrategy</option>
+          <option value="NVDA">NVDA — NVIDIA</option>
+        </optgroup>
+        <optgroup label="KOSPI">
+          <option value="005930.KS">005930.KS — Samsung Electronics</option>
+          <option value="000660.KS">000660.KS — SK Hynix</option>
         </optgroup>
       </select>
       <input id="new-amount" type="number" placeholder="Amount / Shares" step="any" min="0" />
