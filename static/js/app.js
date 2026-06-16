@@ -311,22 +311,12 @@ async function checkAndBackfill() {
 function renderUSTab() {
   const usd_krw = cryptoPrices.usd_krw || 1350;
   document.getElementById("us-usd-krw").textContent = fmtKRW.format(usd_krw);
-  document.getElementById("stocks-grid").innerHTML =
-    Object.entries(stockData.meta || {}).map(([t, name]) => {
-      const p = stockData.prices?.[t];
-      return `<div class="stock-card">
-        <div class="stock-ticker">${t}</div>
-        <div class="stock-name">${name}</div>
-        <div class="stock-price">${p != null ? fmtUSD.format(p) : '<span class="stock-na">N/A</span>'}</div>
-        ${p != null ? `<div class="stock-sub">${fmtKRW.format(p * usd_krw)}</div>` : ""}
-      </div>`;
-    }).join("") || '<div class="stock-loading">No data</div>';
 
   const usH   = holdings.filter(h => STOCK_TYPES.has(h.asset_type));
   let total   = 0;
   const tbody = document.getElementById("us-tbody");
   if (!usH.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No US stock holdings yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No US stock holdings yet.</td></tr>';
   } else {
     tbody.innerHTML = usH.map(h => {
       const usd = stockData.prices?.[h.asset_type] || 0;
@@ -334,7 +324,6 @@ function renderUSTab() {
       total += krw;
       return `<tr>
         <td>${escHtml(h.label)}</td>
-        <td><span class="badge badge-stock">${h.asset_type}</span></td>
         <td>${fmtNum(h.amount)}</td>
         <td class="krw-muted">${usd ? fmtUSD.format(h.amount * usd) : "—"}</td>
         <td>${fmtKRW.format(krw)}</td>
@@ -346,21 +335,11 @@ function renderUSTab() {
 
 // ── Korean Tab ────────────────────────────────────────────────
 function renderKoreanTab() {
-  document.getElementById("kospi-grid").innerHTML =
-    Object.entries(stockData.kospi_meta || {}).map(([t, name]) => {
-      const p = stockData.kospi_prices?.[t];
-      return `<div class="stock-card kospi">
-        <div class="stock-ticker">${KOSPI_BADGE[t] ?? t}</div>
-        <div class="stock-name">${name}</div>
-        <div class="stock-price">${p != null ? fmtKRW.format(p) : '<span class="stock-na">N/A</span>'}</div>
-      </div>`;
-    }).join("") || '<div class="stock-loading">No data</div>';
-
   const kH    = holdings.filter(h => KOSPI_TYPES.has(h.asset_type));
   let total   = 0;
   const tbody = document.getElementById("korean-tbody");
   if (!kH.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No Korean stock holdings yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No Korean stock holdings yet.</td></tr>';
   } else {
     tbody.innerHTML = kH.map(h => {
       const p   = stockData.kospi_prices?.[h.asset_type] || 0;
@@ -368,7 +347,6 @@ function renderKoreanTab() {
       total += krw;
       return `<tr>
         <td>${escHtml(h.label)}</td>
-        <td><span class="badge badge-kospi">${KOSPI_BADGE[h.asset_type] ?? h.asset_type}</span></td>
         <td>${fmtNum(h.amount)}</td>
         <td>${fmtKRW.format(krw)}</td>
       </tr>`;
