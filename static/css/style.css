@@ -305,7 +305,8 @@ h2 {
 
 /* ── Chart ── */
 .chart-empty { color: #6e7681; font-style: italic; text-align: center; padding: 2.5rem; }
-canvas { width: 100% !important; height: 280px !important; }
+canvas { width: 100% !important; }
+.pie-wrap canvas { height: 100% !important; }
 
 /* ── Log ── */
 #log-list { display: flex; flex-direction: column; gap: 0.4rem; }

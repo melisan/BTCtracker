@@ -225,7 +225,8 @@ def fetch_crypto_history_krw(coin_id, days=400):
 def fetch_stock_history_prices(ticker, days=400):
     import yfinance as yf
     t    = yf.Ticker(ticker)
-    hist = t.history(period=f"{min(days, 365)}d", interval="1d")
+    period = "2y" if days >= 365 else f"{days}d"
+    hist = t.history(period=period, interval="1d")
     result = {}
     for date, row in hist.iterrows():
         result[date.strftime("%Y-%m-%d")] = float(row["Close"])
@@ -276,12 +277,13 @@ def run_backfill():
     def do_fetch(key, func, *args):
         try:
             price_data[key] = func(*args)
-        except Exception as e:
+        except Exception:
             price_data[key] = {}
 
+    # Use yfinance for BTC/ETH (avoids CoinGecko rate limits)
     tasks = [
-        ("btc_krw", fetch_crypto_history_krw, "bitcoin", 400),
-        ("eth_krw", fetch_crypto_history_krw, "ethereum", 400),
+        ("btc_usd", fetch_stock_history_prices, "BTC-USD", 400),
+        ("eth_usd", fetch_stock_history_prices, "ETH-USD", 400),
         ("usd_krw", fetch_usdkrw_history, 400),
     ] + [(t, fetch_stock_history_prices, t, 400) for t in list(STOCKS.keys()) + list(KOSPI.keys())]
 
@@ -291,18 +293,18 @@ def run_backfill():
             try: f.result()
             except Exception: pass
 
-    btc_hist    = price_data.get("btc_krw", {})
-    eth_hist    = price_data.get("eth_krw", {})
-    usdkrw_hist = price_data.get("usd_krw", {})
-    today       = datetime.utcnow().date().isoformat()
+    btc_usd_hist = price_data.get("btc_usd", {})
+    eth_usd_hist = price_data.get("eth_usd", {})
+    usdkrw_hist  = price_data.get("usd_krw", {})
+    today        = datetime.utcnow().date().isoformat()
 
     inserted = 0
-    for date in sorted(btc_hist.keys()):
+    for date in sorted(btc_usd_hist.keys()):
         if date >= today or date in existing_dates:
             continue
-        btc_p   = btc_hist.get(date) or 0
-        eth_p   = eth_hist.get(date) or 0
         usd_krw = usdkrw_hist.get(date) or get_nearest_price(usdkrw_hist, date) or 1350
+        btc_p = (btc_usd_hist.get(date) or get_nearest_price(btc_usd_hist, date) or 0) * usd_krw
+        eth_p = (eth_usd_hist.get(date) or get_nearest_price(eth_usd_hist, date) or 0) * usd_krw
 
         bd = {"btc": 0, "eth": 0, "us": 0, "korean": 0, "krw": 0}
         for h in holdings_rows:
