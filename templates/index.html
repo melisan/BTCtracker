@@ -8,8 +8,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-<div class="container">
+<div class="app">
 
+  <!-- Header -->
   <header>
     <div class="logo-row">
       <span class="logo">₿</span>
@@ -18,116 +19,226 @@
     <button id="refresh-btn" class="btn-icon" title="Refresh all prices">⟳</button>
   </header>
 
-  <!-- Crypto + Total -->
-  <div class="top-grid">
-    <div class="price-card">
-      <div class="coin-label"><span class="btc-icon">₿</span> Bitcoin</div>
-      <div id="btc-price" class="coin-price">—</div>
+  <!-- Tab bar -->
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="total">Total</button>
+    <button class="tab-btn" data-tab="us">US Stocks</button>
+    <button class="tab-btn" data-tab="korean">Korean</button>
+    <button class="tab-btn" data-tab="crypto">BTC / ETH</button>
+    <button class="tab-btn" data-tab="krw">KRW</button>
+    <button class="tab-btn tab-locked" data-tab="entry">🔒 Entry</button>
+  </nav>
+
+  <!-- ── TOTAL TAB ── -->
+  <div id="tab-total" class="tab-panel">
+
+    <div class="summary-grid">
+      <div class="scard scard-total">
+        <div class="scard-label">Total Portfolio</div>
+        <div id="sum-total" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-btc">
+        <div class="scard-label">BTC</div>
+        <div id="sum-btc" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-eth">
+        <div class="scard-label">ETH</div>
+        <div id="sum-eth" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-us">
+        <div class="scard-label">US Stocks</div>
+        <div id="sum-us" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-korean">
+        <div class="scard-label">Korean</div>
+        <div id="sum-korean" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-krw">
+        <div class="scard-label">KRW Cash</div>
+        <div id="sum-krw" class="scard-value">—</div>
+      </div>
     </div>
-    <div class="price-card">
-      <div class="coin-label"><span class="eth-icon">Ξ</span> Ethereum</div>
-      <div id="eth-price" class="coin-price">—</div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Portfolio History (Daily)</h2>
+        <div class="chart-toggles">
+          <button class="tog active" data-ds="0" style="--c:#f0f6fc">Total</button>
+          <button class="tog active" data-ds="1" style="--c:#f7931a">BTC</button>
+          <button class="tog active" data-ds="2" style="--c:#627eea">ETH</button>
+          <button class="tog active" data-ds="3" style="--c:#58a6ff">US</button>
+          <button class="tog active" data-ds="4" style="--c:#ff6b6b">Korean</button>
+          <button class="tog active" data-ds="5" style="--c:#3fb950">KRW</button>
+        </div>
+      </div>
+      <div id="total-chart-empty" class="chart-empty">No history yet — data builds as you update assets.</div>
+      <canvas id="total-chart" class="hidden"></canvas>
     </div>
-    <div class="price-card">
-      <div class="coin-label">USD / KRW</div>
-      <div id="usd-krw" class="coin-price">—</div>
+
+    <div class="card">
+      <h2>Change Log</h2>
+      <div id="log-list"><div class="empty-msg">No changes yet.</div></div>
     </div>
-    <div class="price-card total-card">
-      <div class="coin-label">Total Portfolio</div>
-      <div id="total-krw" class="coin-price total-price">—</div>
-      <div id="last-updated" class="ts"></div>
+
+  </div>
+
+  <!-- ── US STOCKS TAB ── -->
+  <div id="tab-us" class="tab-panel hidden">
+
+    <div class="price-strip">
+      <div class="price-chip">
+        <span class="chip-label">USD / KRW</span>
+        <span id="us-usd-krw" class="chip-val">—</span>
+      </div>
+      <span id="stock-ts" class="ts ml-auto"></span>
+    </div>
+
+    <div class="card">
+      <h2>US Stock Prices</h2>
+      <div id="stocks-grid" class="stocks-grid"><div class="stock-loading">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>My US Holdings</h2>
+        <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="us-subtotal" class="subtotal-val">—</span></div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Label</th><th>Ticker</th><th>Shares</th><th>USD Value</th><th>KRW Value</th></tr></thead>
+        <tbody id="us-tbody"><tr class="empty-row"><td colspan="5">No US stock holdings yet.</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ── KOREAN TAB ── -->
+  <div id="tab-korean" class="tab-panel hidden">
+
+    <div class="price-strip">
+      <span id="kospi-ts" class="ts ml-auto"></span>
+    </div>
+
+    <div class="card">
+      <h2>KOSPI Prices</h2>
+      <div id="kospi-grid" class="stocks-grid"><div class="stock-loading">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>My Korean Holdings</h2>
+        <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="korean-subtotal" class="subtotal-val">—</span></div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Label</th><th>Stock</th><th>Shares</th><th>KRW Value</th></tr></thead>
+        <tbody id="korean-tbody"><tr class="empty-row"><td colspan="4">No Korean stock holdings yet.</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ── CRYPTO TAB ── -->
+  <div id="tab-crypto" class="tab-panel hidden">
+
+    <div class="price-strip">
+      <div class="price-chip">
+        <span class="chip-label btc-color">₿ BTC</span>
+        <span id="crypto-btc-price" class="chip-val">—</span>
+      </div>
+      <div class="price-chip">
+        <span class="chip-label eth-color">Ξ ETH</span>
+        <span id="crypto-eth-price" class="chip-val">—</span>
+      </div>
+      <span id="crypto-ts" class="ts ml-auto"></span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>My Crypto Holdings</h2>
+        <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="crypto-subtotal" class="subtotal-val">—</span></div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Label</th><th>Asset</th><th>Amount</th><th>KRW Value</th></tr></thead>
+        <tbody id="crypto-tbody"><tr class="empty-row"><td colspan="4">No crypto holdings yet.</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ── KRW TAB ── -->
+  <div id="tab-krw" class="tab-panel hidden">
+    <div class="card">
+      <div class="card-header">
+        <h2>My KRW Holdings</h2>
+        <div class="subtotal-badge"><span class="subtotal-label">Total</span><span id="krw-subtotal" class="subtotal-val">—</span></div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Label</th><th>Amount (₩)</th></tr></thead>
+        <tbody id="krw-tbody"><tr class="empty-row"><td colspan="2">No KRW holdings yet.</td></tr></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- US Stocks -->
-  <section class="card">
-    <div class="card-header">
-      <h2>US Stocks</h2>
-      <span id="stock-ts" class="ts"></span>
+  <!-- ── ENTRY TAB (admin-locked) ── -->
+  <div id="tab-entry" class="tab-panel hidden">
+    <div class="card">
+      <div class="card-header">
+        <h2>Manage All Assets</h2>
+        <button id="add-btn" class="btn-add">+ Add Entry</button>
+      </div>
+      <table class="table">
+        <thead>
+          <tr><th>Label</th><th>Type</th><th>Amount <span class="hint">(click to edit)</span></th><th>KRW Value</th><th></th></tr>
+        </thead>
+        <tbody id="entry-tbody"><tr class="empty-row"><td colspan="5">No assets yet.</td></tr></tbody>
+      </table>
+      <div id="add-form" class="add-form hidden">
+        <input id="new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
+        <select id="new-type">
+          <optgroup label="Crypto / Cash">
+            <option value="BTC">BTC — Bitcoin</option>
+            <option value="ETH">ETH — Ethereum</option>
+            <option value="KRW">KRW — Korean Won</option>
+          </optgroup>
+          <optgroup label="US Stocks">
+            <option value="AAPL">AAPL — Apple</option>
+            <option value="AMZN">AMZN — Amazon</option>
+            <option value="CVX">CVX — Chevron</option>
+            <option value="LLY">LLY — Eli Lilly</option>
+            <option value="GOOGL">GOOGL — Alphabet A</option>
+            <option value="GOOG">GOOG — Alphabet C</option>
+            <option value="NVO">NVO — Novo Nordisk</option>
+            <option value="OXY">OXY — Occidental</option>
+            <option value="MSTR">MSTR — MicroStrategy</option>
+            <option value="NVDA">NVDA — NVIDIA</option>
+          </optgroup>
+          <optgroup label="KOSPI">
+            <option value="005930.KS">005930.KS — Samsung Electronics</option>
+            <option value="000660.KS">000660.KS — SK Hynix</option>
+          </optgroup>
+        </select>
+        <input id="new-amount" type="number" placeholder="Amount / Shares" step="any" min="0" />
+        <button id="save-new-btn" class="btn-primary">Save</button>
+        <button id="cancel-new-btn" class="btn-secondary">Cancel</button>
+      </div>
     </div>
-    <div id="stocks-grid" class="stocks-grid">
-      <div class="stock-loading">Loading stock prices…</div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Auth Modal -->
+<div id="auth-modal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-box">
+    <div class="modal-title">🔒 Admin Access</div>
+    <input id="auth-pw" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+    <div id="auth-error" class="auth-error hidden">Incorrect password</div>
+    <div class="modal-btns">
+      <button id="auth-submit" class="btn-primary">Unlock</button>
+      <button id="auth-cancel" class="btn-secondary">Cancel</button>
     </div>
-  </section>
-
-  <!-- KOSPI -->
-  <section class="card">
-    <div class="card-header">
-      <h2>KOSPI</h2>
-      <span id="kospi-ts" class="ts"></span>
-    </div>
-    <div id="kospi-grid" class="stocks-grid">
-      <div class="stock-loading">Loading KOSPI prices…</div>
-    </div>
-  </section>
-
-  <!-- Holdings -->
-  <section class="card">
-    <div class="card-header">
-      <h2>My Assets</h2>
-      <button id="add-btn" class="btn-add">+ Add Entry</button>
-    </div>
-
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Label</th>
-          <th>Type</th>
-          <th>Amount <span class="hint">(click to edit)</span></th>
-          <th>KRW Value</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="holdings-tbody">
-        <tr class="empty-row"><td colspan="5">No assets yet.</td></tr>
-      </tbody>
-    </table>
-
-    <div id="add-form" class="add-form hidden">
-      <input id="new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
-      <select id="new-type">
-        <optgroup label="Crypto / Cash">
-          <option value="BTC">BTC — Bitcoin</option>
-          <option value="ETH">ETH — Ethereum</option>
-          <option value="KRW">KRW — Korean Won</option>
-        </optgroup>
-        <optgroup label="US Stocks">
-          <option value="AAPL">AAPL — Apple</option>
-          <option value="AMZN">AMZN — Amazon</option>
-          <option value="CVX">CVX — Chevron</option>
-          <option value="LLY">LLY — Eli Lilly</option>
-          <option value="GOOGL">GOOGL — Alphabet A</option>
-          <option value="GOOG">GOOG — Alphabet C</option>
-          <option value="NVO">NVO — Novo Nordisk</option>
-          <option value="OXY">OXY — Occidental</option>
-          <option value="MSTR">MSTR — MicroStrategy</option>
-          <option value="NVDA">NVDA — NVIDIA</option>
-        </optgroup>
-        <optgroup label="KOSPI">
-          <option value="005930.KS">005930.KS — Samsung Electronics</option>
-          <option value="000660.KS">000660.KS — SK Hynix</option>
-        </optgroup>
-      </select>
-      <input id="new-amount" type="number" placeholder="Amount / Shares" step="any" min="0" />
-      <button id="save-new-btn" class="btn-primary">Save</button>
-      <button id="cancel-new-btn" class="btn-secondary">Cancel</button>
-    </div>
-  </section>
-
-  <!-- Portfolio Chart -->
-  <section class="card">
-    <h2>Portfolio History (Daily KRW)</h2>
-    <div id="chart-empty" class="chart-empty hidden">No history yet — builds as you use the app.</div>
-    <canvas id="portfolio-chart" class="hidden"></canvas>
-  </section>
-
-  <!-- Change Log -->
-  <section class="card">
-    <h2>Change Log</h2>
-    <div id="log-list"><div class="empty-log">No changes logged yet.</div></div>
-  </section>
-
+  </div>
 </div>
+
 <script src="/static/js/app.js"></script>
 </body>
 </html>
