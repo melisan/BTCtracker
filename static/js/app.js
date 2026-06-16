@@ -23,6 +23,8 @@ let pieChart        = null;
 let totalChart      = null;
 let activeTab       = "total";
 let activeRange     = "daily";
+let normalizeMode   = false;
+let historyData     = [];
 let isAuthenticated = false;
 let togglesWired    = false;
 
@@ -215,20 +217,45 @@ function renderLineChart(data) {
   }
   canvas.classList.remove("hidden"); empty.classList.add("hidden");
 
-  const labels   = data.map(d => d.date);
-  const datasets = SERIES.map((s, i) => ({
-    id: s.key, label: s.label,
-    data: data.map(d => d[s.key] || 0),
-    borderColor: s.color,
-    backgroundColor: s.color + "12",
-    borderWidth: i === 0 ? 2.5 : 1.5,
-    pointRadius: 0, pointHoverRadius: 4,
-    fill: false, tension: 0.3,
-  }));
+  const labels = data.map(d => d.date);
+
+  const datasets = SERIES.map((s, i) => {
+    let values = data.map(d => d[s.key] || 0);
+    if (normalizeMode) {
+      const nonZero = values.filter(v => v > 0);
+      if (nonZero.length) {
+        const ref = nonZero[nonZero.length - 1];
+        values = values.map(v => v > 0 ? parseFloat((v / ref * 100).toFixed(2)) : null);
+      } else {
+        values = values.map(() => null);
+      }
+    }
+    return {
+      id: s.key, label: s.label, data: values,
+      borderColor: s.color, backgroundColor: s.color + "12",
+      borderWidth: i === 0 ? 2.5 : 1.5,
+      pointRadius: 0, pointHoverRadius: 4,
+      fill: false, tension: 0.3, spanGaps: false,
+    };
+  });
+
+  const yTickCb = normalizeMode
+    ? v => v.toFixed(1) + "%"
+    : v => {
+        if (v >= 1e8) return (v / 1e8).toFixed(1) + "억";
+        if (v >= 1e4) return (v / 1e4).toFixed(0) + "만";
+        return v.toLocaleString();
+      };
+
+  const tooltipLabelCb = normalizeMode
+    ? ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + "%" : "—"}`
+    : ctx => `${ctx.dataset.label}: ${fmtKRW.format(ctx.parsed.y)}`;
 
   if (totalChart) {
     totalChart.data.labels = labels;
     totalChart.data.datasets.forEach((ds, i) => { ds.data = datasets[i].data; });
+    totalChart.options.scales.y.ticks.callback = yTickCb;
+    totalChart.options.plugins.tooltip.callbacks.label = tooltipLabelCb;
     totalChart.update("none");
     return;
   }
@@ -241,20 +268,15 @@ function renderLineChart(data) {
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtKRW.format(ctx.parsed.y)}` }},
+        tooltip: { callbacks: { label: tooltipLabelCb }},
       },
       scales: {
         x: { ticks: { color: "#6e7681", maxRotation: 0, maxTicksLimit: 10 }, grid: { color: "#21262d" }},
-        y: { ticks: { color: "#6e7681", callback: v => {
-          if (v >= 1e8) return (v / 1e8).toFixed(1) + "억";
-          if (v >= 1e4) return (v / 1e4).toFixed(0) + "만";
-          return v.toLocaleString();
-        }}, grid: { color: "#21262d" }},
+        y: { ticks: { color: "#6e7681", callback: yTickCb }, grid: { color: "#21262d" }},
       },
     },
   });
 
-  // Wire series toggle buttons once
   if (!togglesWired) {
     togglesWired = true;
     document.querySelectorAll(".tog").forEach(btn => {
@@ -270,20 +292,27 @@ function renderLineChart(data) {
 
 async function fetchHistory() {
   try {
-    const res  = await fetch(`/api/portfolio/history?range=${activeRange}`);
-    const data = await res.json();
-    renderLineChart(data);
+    const res   = await fetch(`/api/portfolio/history?range=${activeRange}`);
+    historyData = await res.json();
+    renderLineChart(historyData);
   } catch (err) { console.error("History fetch failed:", err); }
 }
 
 // Wire range buttons
-document.querySelectorAll(".range-btn").forEach(btn => {
+document.querySelectorAll(".range-btn[data-range]").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".range-btn[data-range]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     activeRange = btn.dataset.range;
     fetchHistory();
   });
+});
+
+// Wire normalize (Indexed) toggle
+document.getElementById("normalize-btn").addEventListener("click", () => {
+  normalizeMode = !normalizeMode;
+  document.getElementById("normalize-btn").classList.toggle("active", normalizeMode);
+  renderLineChart(historyData);
 });
 
 // ── Backfill ──────────────────────────────────────────────────

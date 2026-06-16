@@ -159,6 +159,8 @@ h1 { font-size: 1.35rem; font-weight: 700; color: #f0f6fc; }
 }
 .range-btn:hover { border-color: #58a6ff; color: #58a6ff; }
 .range-btn.active { border-color: #f7931a; color: #f7931a; background: rgba(247,147,26,0.1); }
+.norm-btn { margin-left: 0.4rem; }
+.norm-btn.active { border-color: #58a6ff !important; color: #58a6ff !important; background: rgba(88,166,255,0.1) !important; }
 
 /* ── Line card canvas height ── */
 .line-card canvas { height: 260px !important; }
