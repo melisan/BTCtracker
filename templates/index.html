@@ -59,25 +59,43 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <h2>Portfolio History (Daily)</h2>
-        <div class="chart-toggles">
-          <button class="tog active" data-ds="0" style="--c:#f0f6fc">Total</button>
-          <button class="tog active" data-ds="1" style="--c:#f7931a">BTC</button>
-          <button class="tog active" data-ds="2" style="--c:#627eea">ETH</button>
-          <button class="tog active" data-ds="3" style="--c:#58a6ff">US</button>
-          <button class="tog active" data-ds="4" style="--c:#ff6b6b">Korean</button>
-          <button class="tog active" data-ds="5" style="--c:#3fb950">KRW</button>
-        </div>
-      </div>
-      <div id="total-chart-empty" class="chart-empty">No history yet — data builds as you update assets.</div>
-      <canvas id="total-chart" class="hidden"></canvas>
+    <div id="backfill-banner" class="backfill-banner hidden">
+      ⏳ Fetching historical price data (first time only, may take 30s)…
     </div>
 
-    <div class="card">
-      <h2>Change Log</h2>
-      <div id="log-list"><div class="empty-msg">No changes yet.</div></div>
+    <div class="charts-row">
+      <!-- Pie / Donut chart -->
+      <div class="card pie-card">
+        <h2>Allocation</h2>
+        <div class="pie-wrap">
+          <canvas id="pie-chart"></canvas>
+        </div>
+        <div id="pie-legend" class="pie-legend"></div>
+      </div>
+
+      <!-- Multi-line history chart -->
+      <div class="card line-card">
+        <div class="card-header">
+          <h2>Portfolio History</h2>
+          <div class="chart-controls">
+            <div class="range-btns">
+              <button class="range-btn active" data-range="daily">30D</button>
+              <button class="range-btn" data-range="weekly">52W</button>
+              <button class="range-btn" data-range="monthly">12M</button>
+            </div>
+            <div class="chart-toggles">
+              <button class="tog active" data-ds="0" style="--c:#f0f6fc">Total</button>
+              <button class="tog active" data-ds="1" style="--c:#f7931a">BTC</button>
+              <button class="tog active" data-ds="2" style="--c:#627eea">ETH</button>
+              <button class="tog active" data-ds="3" style="--c:#58a6ff">US</button>
+              <button class="tog active" data-ds="4" style="--c:#ff6b6b">Korean</button>
+              <button class="tog active" data-ds="5" style="--c:#3fb950">KRW</button>
+            </div>
+          </div>
+        </div>
+        <div id="total-chart-empty" class="chart-empty">No history yet — data builds as you update assets.</div>
+        <canvas id="total-chart" class="hidden"></canvas>
+      </div>
     </div>
 
   </div>

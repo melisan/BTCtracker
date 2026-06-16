@@ -76,6 +76,55 @@ h1 { font-size: 1.35rem; font-weight: 700; color: #f0f6fc; }
 .scard-krw    { border-color: rgba(63,185,80,0.25); }
 .scard-krw    .scard-value { color: #3fb950; }
 
+/* ── Backfill banner ── */
+.backfill-banner {
+  background: rgba(88,166,255,0.1);
+  border: 1px solid rgba(88,166,255,0.3);
+  border-radius: 8px;
+  color: #58a6ff;
+  font-size: 0.85rem;
+  padding: 0.75rem 1.1rem;
+  margin-bottom: 1.1rem;
+  text-align: center;
+}
+
+/* ── Charts side-by-side ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.1rem;
+  margin-bottom: 1.1rem;
+}
+
+.pie-card { display: flex; flex-direction: column; }
+
+.pie-wrap {
+  position: relative;
+  height: 200px;
+  margin-bottom: 0.75rem;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: auto;
+}
+.pie-leg-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+.pie-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pie-leg-label { color: #8b949e; flex: 1; }
+.pie-leg-val   { color: #c9d1d9; font-size: 0.76rem; }
+.pie-leg-pct   { color: #6e7681; min-width: 36px; text-align: right; }
+
 /* ── Chart toggles ── */
 .chart-toggles { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .tog {
@@ -90,6 +139,29 @@ h1 { font-size: 1.35rem; font-weight: 700; color: #f0f6fc; }
   color: var(--c);
   background: color-mix(in srgb, var(--c) 12%, transparent);
 }
+
+/* ── Range buttons ── */
+.chart-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+.range-btns { display: flex; gap: 0.3rem; }
+.range-btn {
+  background: transparent;
+  border: 1px solid #30363d;
+  color: #6e7681;
+  font-size: 0.75rem; font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px; cursor: pointer;
+  transition: all 0.15s;
+}
+.range-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+.range-btn.active { border-color: #f7931a; color: #f7931a; background: rgba(247,147,26,0.1); }
+
+/* ── Line card canvas height ── */
+.line-card canvas { height: 260px !important; }
 
 /* ── Price strip ── */
 .price-strip {
@@ -279,6 +351,10 @@ canvas { width: 100% !important; height: 280px !important; }
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .summary-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+  .charts-row { grid-template-columns: 1fr; }
+  .pie-wrap { height: 180px; }
 }
 @media (max-width: 560px) {
   .summary-grid { grid-template-columns: repeat(2, 1fr); }

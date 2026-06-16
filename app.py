@@ -5,7 +5,7 @@ import psycopg2.extras
 import os
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
@@ -206,6 +206,136 @@ def save_snapshot(conn, crypto_prices, breakdown):
     ))
 
 
+# ── Historical backfill helpers ───────────────────────────────
+
+def fetch_crypto_history_krw(coin_id, days=400):
+    resp = requests.get(
+        f"{COINGECKO_BASE}/coins/{coin_id}/market_chart",
+        params={"vs_currency": "krw", "days": days, "interval": "daily"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    result = {}
+    for ts, price in resp.json()["prices"]:
+        date = datetime.utcfromtimestamp(ts / 1000).strftime("%Y-%m-%d")
+        result[date] = price
+    return result
+
+
+def fetch_stock_history_prices(ticker, days=400):
+    import yfinance as yf
+    t    = yf.Ticker(ticker)
+    hist = t.history(period=f"{min(days, 365)}d", interval="1d")
+    result = {}
+    for date, row in hist.iterrows():
+        result[date.strftime("%Y-%m-%d")] = float(row["Close"])
+    return result
+
+
+def fetch_usdkrw_history(days=400):
+    import yfinance as yf
+    t    = yf.Ticker("USDKRW=X")
+    hist = t.history(period=f"{min(days, 365)}d", interval="1d")
+    result = {}
+    for date, row in hist.iterrows():
+        result[date.strftime("%Y-%m-%d")] = float(row["Close"])
+    return result
+
+
+def get_nearest_price(price_dict, target_date):
+    if not price_dict:
+        return 0
+    dt = datetime.strptime(target_date, "%Y-%m-%d")
+    for i in range(1, 8):
+        d = (dt - timedelta(days=i)).strftime("%Y-%m-%d")
+        if d in price_dict:
+            return price_dict[d]
+    for i in range(1, 8):
+        d = (dt + timedelta(days=i)).strftime("%Y-%m-%d")
+        if d in price_dict:
+            return price_dict[d]
+    return 0
+
+
+def run_backfill():
+    conn = get_db()
+    try:
+        holdings_rows = [dict(r) for r in query(conn, "SELECT * FROM holdings").fetchall()]
+        if not holdings_rows:
+            conn.close()
+            return 0
+        existing_dates = set(
+            r["date"] for r in query(conn, "SELECT date FROM portfolio_snapshots").fetchall()
+        )
+    except Exception:
+        conn.close()
+        return 0
+
+    price_data = {}
+
+    def do_fetch(key, func, *args):
+        try:
+            price_data[key] = func(*args)
+        except Exception as e:
+            price_data[key] = {}
+
+    tasks = [
+        ("btc_krw", fetch_crypto_history_krw, "bitcoin", 400),
+        ("eth_krw", fetch_crypto_history_krw, "ethereum", 400),
+        ("usd_krw", fetch_usdkrw_history, 400),
+    ] + [(t, fetch_stock_history_prices, t, 400) for t in list(STOCKS.keys()) + list(KOSPI.keys())]
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futs = [ex.submit(do_fetch, *task) for task in tasks]
+        for f in as_completed(futs, timeout=90):
+            try: f.result()
+            except Exception: pass
+
+    btc_hist    = price_data.get("btc_krw", {})
+    eth_hist    = price_data.get("eth_krw", {})
+    usdkrw_hist = price_data.get("usd_krw", {})
+    today       = datetime.utcnow().date().isoformat()
+
+    inserted = 0
+    for date in sorted(btc_hist.keys()):
+        if date >= today or date in existing_dates:
+            continue
+        btc_p   = btc_hist.get(date) or 0
+        eth_p   = eth_hist.get(date) or 0
+        usd_krw = usdkrw_hist.get(date) or get_nearest_price(usdkrw_hist, date) or 1350
+
+        bd = {"btc": 0, "eth": 0, "us": 0, "korean": 0, "krw": 0}
+        for h in holdings_rows:
+            t, amt = h["asset_type"], h["amount"]
+            if   t == "BTC": bd["btc"] += amt * btc_p
+            elif t == "ETH": bd["eth"] += amt * eth_p
+            elif t == "KRW": bd["krw"] += amt
+            elif t in STOCKS:
+                p = price_data.get(t, {}).get(date) or get_nearest_price(price_data.get(t, {}), date) or 0
+                bd["us"] += amt * p * usd_krw
+            elif t in KOSPI:
+                p = price_data.get(t, {}).get(date) or get_nearest_price(price_data.get(t, {}), date) or 0
+                bd["korean"] += amt * p
+        bd["total"] = sum(bd.values())
+
+        try:
+            query(conn, """
+                INSERT INTO portfolio_snapshots
+                    (total_krw, btc_price_krw, eth_price_krw, date,
+                     btc_total_krw, eth_total_krw, us_total_krw, korean_total_krw, krw_total_krw)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (date) DO NOTHING
+            """, (bd["total"], btc_p, eth_p, date,
+                  bd["btc"], bd["eth"], bd["us"], bd["korean"], bd["krw"]))
+            inserted += 1
+        except Exception:
+            pass
+
+    conn.commit()
+    conn.close()
+    return inserted
+
+
 def _do_snapshot(conn):
     try:
         crypto  = fetch_crypto_prices()
@@ -348,15 +478,44 @@ def api_delete_holding(hid):
 
 @app.route("/api/portfolio/history")
 def api_portfolio_history():
+    range_type = request.args.get("range", "daily")
     conn = get_db()
     cur  = query(conn, """
         SELECT date, total_krw, btc_total_krw, eth_total_krw,
                us_total_krw, korean_total_krw, krw_total_krw
-        FROM portfolio_snapshots ORDER BY date DESC LIMIT 90
+        FROM portfolio_snapshots ORDER BY date ASC
     """)
-    rows = [dict(r) for r in reversed(cur.fetchall())]
+    all_rows = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
+
+    if range_type == "weekly":
+        weeks = {}
+        for r in all_rows:
+            try:
+                dt = datetime.strptime(r["date"], "%Y-%m-%d")
+                wk = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
+                weeks[wk] = r
+            except Exception:
+                pass
+        rows = list(weeks.values())[-52:]
+    elif range_type == "monthly":
+        months = {}
+        for r in all_rows:
+            months[r["date"][:7]] = r
+        rows = list(months.values())[-12:]
+    else:
+        rows = all_rows[-30:]
+
     return jsonify(rows)
+
+
+@app.route("/api/portfolio/backfill", methods=["POST"])
+def api_backfill():
+    try:
+        count = run_backfill()
+        return jsonify({"inserted": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/logs")
