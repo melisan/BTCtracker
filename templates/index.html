@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTC Tracker</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">₿</div>
+      <h1>BTC Tracker</h1>
+      <span id="last-updated" class="timestamp"></span>
+    </header>
+
+    <section class="price-card">
+      <div class="price-row">
+        <span id="price" class="price">—</span>
+        <span id="change" class="change">—</span>
+      </div>
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat-label">Market Cap</span>
+          <span id="market-cap" class="stat-value">—</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">24h Volume</span>
+          <span id="volume" class="stat-value">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-controls">
+        <button class="range-btn active" data-days="1">1D</button>
+        <button class="range-btn" data-days="7">7D</button>
+        <button class="range-btn" data-days="30">1M</button>
+        <button class="range-btn" data-days="90">3M</button>
+        <button class="range-btn" data-days="365">1Y</button>
+      </div>
+      <canvas id="chart"></canvas>
+    </section>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
