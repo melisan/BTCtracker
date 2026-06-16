@@ -3,16 +3,37 @@ import requests
 import sqlite3
 import os
 import time
+import logging
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 app = Flask(__name__)
 
 DB_PATH = os.environ.get("DB_PATH", "btctracker.db")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 
-_price_cache = {"data": None, "ts": 0}
-CACHE_TTL = 60
+STOCKS = {
+    "AAPL": "Apple",
+    "AMZN": "Amazon",
+    "CVX": "Chevron",
+    "LLY": "Eli Lilly",
+    "GOOGL": "Alphabet A",
+    "GOOG": "Alphabet C",
+    "NVO": "Novo Nordisk",
+    "OXY": "Occidental",
+}
 
+VALID_TYPES = {"BTC", "ETH", "KRW"} | set(STOCKS.keys())
+
+_price_cache = {"data": None, "ts": 0}
+_stock_cache = {"data": None, "ts": 0}
+CRYPTO_TTL = 60
+STOCK_TTL = 300  # 5 minutes
+
+
+# ── DB ────────────────────────────────────────────────────────
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -54,36 +75,81 @@ def init_db():
     conn.close()
 
 
-def fetch_prices():
+# ── Price fetching ────────────────────────────────────────────
+
+def fetch_crypto_prices():
     now = time.time()
-    if _price_cache["data"] and now - _price_cache["ts"] < CACHE_TTL:
+    if _price_cache["data"] and now - _price_cache["ts"] < CRYPTO_TTL:
         return _price_cache["data"]
     resp = requests.get(
         f"{COINGECKO_BASE}/simple/price",
-        params={"ids": "bitcoin,ethereum", "vs_currencies": "krw"},
+        params={"ids": "bitcoin,ethereum", "vs_currencies": "usd,krw"},
         timeout=10,
     )
     resp.raise_for_status()
     data = resp.json()
-    result = {"btc": data["bitcoin"]["krw"], "eth": data["ethereum"]["krw"]}
+    btc_usd = data["bitcoin"]["usd"]
+    btc_krw = data["bitcoin"]["krw"]
+    result = {
+        "btc": data["bitcoin"]["krw"],
+        "eth": data["ethereum"]["krw"],
+        "usd_krw": round(btc_krw / btc_usd, 2) if btc_usd else 1350,
+    }
     _price_cache["data"] = result
     _price_cache["ts"] = now
     return result
 
 
-def calc_total_krw(holdings, prices):
+def _fetch_one_stock(ticker):
+    import yfinance as yf
+    t = yf.Ticker(ticker)
+    price = t.fast_info.last_price
+    return ticker, float(price) if price else None
+
+
+def fetch_stock_prices():
+    now = time.time()
+    if _stock_cache["data"] and now - _stock_cache["ts"] < STOCK_TTL:
+        return _stock_cache["data"]
+
+    prices = {}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = {ex.submit(_fetch_one_stock, t): t for t in STOCKS}
+        for future in as_completed(futures, timeout=15):
+            try:
+                ticker, price = future.result()
+                prices[ticker] = price
+            except Exception:
+                prices[futures[future]] = None
+
+    result = {"prices": prices, "updated_at": datetime.utcnow().isoformat()}
+    _stock_cache["data"] = result
+    _stock_cache["ts"] = now
+    return result
+
+
+# ── Portfolio calculation ─────────────────────────────────────
+
+def calc_total_krw(holdings, crypto_prices, stock_data=None):
     total = 0
+    usd_krw = crypto_prices.get("usd_krw", 1350)
+    stock_prices = (stock_data or {}).get("prices", {})
     for h in holdings:
-        if h["asset_type"] == "BTC":
-            total += h["amount"] * prices["btc"]
-        elif h["asset_type"] == "ETH":
-            total += h["amount"] * prices["eth"]
-        elif h["asset_type"] == "KRW":
-            total += h["amount"]
+        t = h["asset_type"]
+        amt = h["amount"]
+        if t == "BTC":
+            total += amt * crypto_prices["btc"]
+        elif t == "ETH":
+            total += amt * crypto_prices["eth"]
+        elif t == "KRW":
+            total += amt
+        elif t in STOCKS:
+            usd = stock_prices.get(t) or 0
+            total += amt * usd * usd_krw
     return total
 
 
-def save_snapshot(conn, total_krw, prices):
+def save_snapshot(conn, total_krw, crypto_prices):
     today = datetime.utcnow().date().isoformat()
     conn.execute(
         """INSERT INTO portfolio_snapshots (total_krw, btc_price_krw, eth_price_krw, date)
@@ -93,9 +159,11 @@ def save_snapshot(conn, total_krw, prices):
                btc_price_krw = excluded.btc_price_krw,
                eth_price_krw = excluded.eth_price_krw,
                snapped_at = datetime('now')""",
-        (total_krw, prices["btc"], prices["eth"], today),
+        (total_krw, crypto_prices["btc"], crypto_prices["eth"], today),
     )
 
+
+# ── Routes ────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -105,7 +173,16 @@ def index():
 @app.route("/api/prices")
 def api_prices():
     try:
-        return jsonify(fetch_prices())
+        return jsonify(fetch_crypto_prices())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/stocks")
+def api_stocks():
+    try:
+        data = fetch_stock_prices()
+        return jsonify({**data, "meta": STOCKS})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -130,7 +207,7 @@ def api_add_holding():
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid amount"}), 400
 
-    if not label or asset_type not in ("BTC", "ETH", "KRW") or amount < 0:
+    if not label or asset_type not in VALID_TYPES or amount < 0:
         return jsonify({"error": "Invalid input"}), 400
 
     conn = get_db()
@@ -141,14 +218,15 @@ def api_add_holding():
     holding_id = cur.lastrowid
 
     try:
-        prices = fetch_prices()
+        crypto = fetch_crypto_prices()
+        stocks = _stock_cache["data"]
         rows = conn.execute("SELECT * FROM holdings").fetchall()
-        total = calc_total_krw([dict(r) for r in rows], prices)
+        total = calc_total_krw([dict(r) for r in rows], crypto, stocks)
         conn.execute(
             "INSERT INTO holding_logs (holding_id, label, asset_type, old_amount, new_amount, total_krw) VALUES (?,?,?,?,?,?)",
             (holding_id, label, asset_type, 0, amount, total),
         )
-        save_snapshot(conn, total, prices)
+        save_snapshot(conn, total, crypto)
     except Exception:
         pass
 
@@ -180,14 +258,15 @@ def api_update_holding(hid):
     )
 
     try:
-        prices = fetch_prices()
+        crypto = fetch_crypto_prices()
+        stocks = _stock_cache["data"]
         rows = conn.execute("SELECT * FROM holdings").fetchall()
-        total = calc_total_krw([dict(r) for r in rows], prices)
+        total = calc_total_krw([dict(r) for r in rows], crypto, stocks)
         conn.execute(
             "INSERT INTO holding_logs (holding_id, label, asset_type, old_amount, new_amount, total_krw) VALUES (?,?,?,?,?,?)",
             (hid, row["label"], row["asset_type"], old_amount, new_amount, total),
         )
-        save_snapshot(conn, total, prices)
+        save_snapshot(conn, total, crypto)
     except Exception:
         pass
 
@@ -202,7 +281,6 @@ def api_delete_holding(hid):
     row = conn.execute("SELECT * FROM holdings WHERE id = ?", (hid,)).fetchone()
     if row:
         try:
-            prices = fetch_prices()
             conn.execute(
                 "INSERT INTO holding_logs (holding_id, label, asset_type, old_amount, new_amount, total_krw) VALUES (?,?,?,?,?,?)",
                 (hid, row["label"], row["asset_type"], row["amount"], 0, 0),

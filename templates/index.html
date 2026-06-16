@@ -8,82 +8,109 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <div class="container">
+<div class="container">
 
-    <header>
-      <div class="logo-row">
-        <span class="logo">₿</span>
-        <h1>Portfolio Tracker</h1>
-      </div>
-      <button id="refresh-btn" class="btn-icon" title="Refresh prices">⟳</button>
-    </header>
+  <header>
+    <div class="logo-row">
+      <span class="logo">₿</span>
+      <h1>Portfolio Tracker</h1>
+    </div>
+    <button id="refresh-btn" class="btn-icon" title="Refresh all prices">⟳</button>
+  </header>
 
-    <!-- Price + Total -->
-    <div class="top-grid">
-      <div class="price-card">
-        <div class="coin-label"><span class="btc-icon">₿</span> Bitcoin</div>
-        <div id="btc-price" class="coin-price">—</div>
-      </div>
-      <div class="price-card">
-        <div class="coin-label"><span class="eth-icon">Ξ</span> Ethereum</div>
-        <div id="eth-price" class="coin-price">—</div>
-      </div>
-      <div class="price-card total-card">
-        <div class="coin-label">Total Portfolio</div>
-        <div id="total-krw" class="coin-price total-price">—</div>
-        <div id="last-updated" class="ts"></div>
-      </div>
+  <!-- Crypto + Total -->
+  <div class="top-grid">
+    <div class="price-card">
+      <div class="coin-label"><span class="btc-icon">₿</span> Bitcoin</div>
+      <div id="btc-price" class="coin-price">—</div>
+    </div>
+    <div class="price-card">
+      <div class="coin-label"><span class="eth-icon">Ξ</span> Ethereum</div>
+      <div id="eth-price" class="coin-price">—</div>
+    </div>
+    <div class="price-card">
+      <div class="coin-label">USD / KRW</div>
+      <div id="usd-krw" class="coin-price">—</div>
+    </div>
+    <div class="price-card total-card">
+      <div class="coin-label">Total Portfolio</div>
+      <div id="total-krw" class="coin-price total-price">—</div>
+      <div id="last-updated" class="ts"></div>
+    </div>
+  </div>
+
+  <!-- US Stocks -->
+  <section class="card">
+    <div class="card-header">
+      <h2>US Stocks</h2>
+      <span id="stock-ts" class="ts"></span>
+    </div>
+    <div id="stocks-grid" class="stocks-grid">
+      <div class="stock-loading">Loading stock prices…</div>
+    </div>
+  </section>
+
+  <!-- Holdings -->
+  <section class="card">
+    <div class="card-header">
+      <h2>My Assets</h2>
+      <button id="add-btn" class="btn-add">+ Add Entry</button>
     </div>
 
-    <!-- Holdings -->
-    <section class="card">
-      <div class="card-header">
-        <h2>My Assets</h2>
-        <button id="add-btn" class="btn-add">+ Add Entry</button>
-      </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Label</th>
+          <th>Type</th>
+          <th>Amount <span class="hint">(click to edit)</span></th>
+          <th>KRW Value</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="holdings-tbody">
+        <tr class="empty-row"><td colspan="5">No assets yet.</td></tr>
+      </tbody>
+    </table>
 
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Label</th>
-            <th>Type</th>
-            <th>Amount <span class="hint">(click to edit)</span></th>
-            <th>KRW Value</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="holdings-tbody">
-          <tr class="empty-row"><td colspan="5">No assets yet.</td></tr>
-        </tbody>
-      </table>
+    <div id="add-form" class="add-form hidden">
+      <input id="new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
+      <select id="new-type">
+        <optgroup label="Crypto / Cash">
+          <option value="BTC">BTC — Bitcoin</option>
+          <option value="ETH">ETH — Ethereum</option>
+          <option value="KRW">KRW — Korean Won</option>
+        </optgroup>
+        <optgroup label="US Stocks">
+          <option value="AAPL">AAPL — Apple</option>
+          <option value="AMZN">AMZN — Amazon</option>
+          <option value="CVX">CVX — Chevron</option>
+          <option value="LLY">LLY — Eli Lilly</option>
+          <option value="GOOGL">GOOGL — Alphabet A</option>
+          <option value="GOOG">GOOG — Alphabet C</option>
+          <option value="NVO">NVO — Novo Nordisk</option>
+          <option value="OXY">OXY — Occidental</option>
+        </optgroup>
+      </select>
+      <input id="new-amount" type="number" placeholder="Amount / Shares" step="any" min="0" />
+      <button id="save-new-btn" class="btn-primary">Save</button>
+      <button id="cancel-new-btn" class="btn-secondary">Cancel</button>
+    </div>
+  </section>
 
-      <div id="add-form" class="add-form hidden">
-        <input id="new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
-        <select id="new-type">
-          <option value="BTC">BTC</option>
-          <option value="ETH">ETH</option>
-          <option value="KRW">KRW</option>
-        </select>
-        <input id="new-amount" type="number" placeholder="Amount" step="any" min="0" />
-        <button id="save-new-btn" class="btn-primary">Save</button>
-        <button id="cancel-new-btn" class="btn-secondary">Cancel</button>
-      </div>
-    </section>
+  <!-- Portfolio Chart -->
+  <section class="card">
+    <h2>Portfolio History (Daily KRW)</h2>
+    <div id="chart-empty" class="chart-empty hidden">No history yet — builds as you use the app.</div>
+    <canvas id="portfolio-chart" class="hidden"></canvas>
+  </section>
 
-    <!-- Portfolio Chart -->
-    <section class="card">
-      <h2>Portfolio History (Daily KRW)</h2>
-      <div id="chart-empty" class="chart-empty hidden">No history yet — history builds as you use the app.</div>
-      <canvas id="portfolio-chart" class="hidden"></canvas>
-    </section>
+  <!-- Change Log -->
+  <section class="card">
+    <h2>Change Log</h2>
+    <div id="log-list"><div class="empty-log">No changes logged yet.</div></div>
+  </section>
 
-    <!-- Change Log -->
-    <section class="card">
-      <h2>Change Log</h2>
-      <div id="log-list"><div class="empty-log">No changes logged yet.</div></div>
-    </section>
-
-  </div>
-  <script src="/static/js/app.js"></script>
+</div>
+<script src="/static/js/app.js"></script>
 </body>
 </html>
