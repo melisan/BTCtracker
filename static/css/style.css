@@ -165,6 +165,10 @@ h1 { font-size: 1.35rem; font-weight: 700; color: #f0f6fc; }
 /* ── Line card canvas height ── */
 .line-card canvas { height: 260px !important; }
 
+/* ── US stocks history chart ── */
+.us-chart-wrap { position: relative; height: 220px; }
+.us-chart-wrap canvas { height: 100% !important; }
+
 /* ── Price strip ── */
 .price-strip {
   display: flex; align-items: center; gap: 1rem;

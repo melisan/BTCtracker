@@ -21,10 +21,12 @@ let stockData       = { prices: {}, kospi_prices: {}, meta: {}, kospi_meta: {} }
 let holdings        = [];
 let pieChart        = null;
 let totalChart      = null;
+let usStocksChart   = null;
 let activeTab       = "total";
 let activeRange     = "daily";
 let normalizeMode   = false;
 let historyData     = [];
+let usHistoryData   = {};
 let isAuthenticated = false;
 let togglesWired    = false;
 
@@ -336,10 +338,79 @@ async function checkAndBackfill() {
   }
 }
 
+// ── US Stock History Chart ────────────────────────────────────
+const STOCK_COLORS = [
+  "#58a6ff","#3fb950","#a371f7","#e3b341","#ff7b72",
+  "#79c0ff","#56d364","#ffa657","#ff6b6b","#f0883e",
+];
+
+async function fetchUSHistory() {
+  try {
+    const res = await fetch("/api/stocks/history");
+    usHistoryData = await res.json();
+    renderUSStocksChart();
+  } catch (err) { console.error("US history fetch failed:", err); }
+}
+
+function renderUSStocksChart() {
+  const canvas = document.getElementById("us-stocks-chart");
+  const empty  = document.getElementById("us-chart-empty");
+  if (!canvas) return;
+
+  const tickers = [...new Set(holdings.filter(h => STOCK_TYPES.has(h.asset_type)).map(h => h.asset_type))];
+  if (!tickers.length || !Object.keys(usHistoryData).length) {
+    canvas.classList.add("hidden"); empty.classList.remove("hidden"); return;
+  }
+
+  const allDates = [...new Set(tickers.flatMap(t => Object.keys(usHistoryData[t] || {})))].sort();
+  if (!allDates.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
+  canvas.classList.remove("hidden"); empty.classList.add("hidden");
+
+  const datasets = tickers.map((t, i) => {
+    const prices = usHistoryData[t] || {};
+    const vals   = allDates.map(d => prices[d] ?? null);
+    const first  = vals.find(v => v != null) || 1;
+    return {
+      label: t,
+      data: vals.map(v => v != null ? parseFloat((v / first * 100).toFixed(2)) : null),
+      borderColor: STOCK_COLORS[i % STOCK_COLORS.length],
+      backgroundColor: "transparent",
+      borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4,
+      fill: false, tension: 0.3, spanGaps: false,
+    };
+  });
+
+  if (usStocksChart) {
+    usStocksChart.data.labels   = allDates;
+    usStocksChart.data.datasets = datasets;
+    usStocksChart.update("none");
+    return;
+  }
+
+  usStocksChart = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: { labels: allDates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: "#8b949e", font: { size: 11 }, boxWidth: 12, padding: 10 }},
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + "%" : "—"}` }},
+      },
+      scales: {
+        x: { ticks: { color: "#6e7681", maxRotation: 0, maxTicksLimit: 8 }, grid: { color: "#21262d" }},
+        y: { ticks: { color: "#6e7681", callback: v => v.toFixed(0) + "%" }, grid: { color: "#21262d" }},
+      },
+    },
+  });
+}
+
 // ── US Stocks Tab ─────────────────────────────────────────────
 function renderUSTab() {
   const usd_krw = cryptoPrices.usd_krw || 1350;
   document.getElementById("us-usd-krw").textContent = fmtKRW.format(usd_krw);
+  if (!Object.keys(usHistoryData).length) fetchUSHistory();
+  else renderUSStocksChart();
 
   const usH   = holdings.filter(h => STOCK_TYPES.has(h.asset_type));
   let total   = 0;

@@ -36,9 +36,11 @@ KOSPI = {
 
 VALID_TYPES = {"BTC", "ETH", "KRW"} | set(STOCKS.keys()) | set(KOSPI.keys())
 
-_price_cache = {"data": None, "date": None}
-_stock_cache = {"data": None, "ts": 0}
-STOCK_TTL  = 300
+_price_cache        = {"data": None, "date": None}
+_stock_cache        = {"data": None, "ts": 0}
+_stock_hist_cache   = {"data": None, "ts": 0}
+STOCK_TTL      = 300
+STOCK_HIST_TTL = 3600
 
 
 # ── DB ────────────────────────────────────────────────────────
@@ -378,6 +380,29 @@ def api_stocks():
         return jsonify({**data, "meta": STOCKS, "kospi_meta": KOSPI})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/stocks/history")
+def api_stocks_history():
+    now = time.time()
+    if _stock_hist_cache["data"] and now - _stock_hist_cache["ts"] < STOCK_HIST_TTL:
+        return jsonify(_stock_hist_cache["data"])
+    result = {}
+    def fetch_one(ticker):
+        import yfinance as yf
+        hist = yf.Ticker(ticker).history(period="35d", interval="1d")
+        return ticker, {d.strftime("%Y-%m-%d"): float(row["Close"]) for d, row in hist.iterrows()}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = {ex.submit(fetch_one, t): t for t in STOCKS}
+        for f in as_completed(futures, timeout=30):
+            try:
+                t, prices = f.result()
+                result[t] = prices
+            except Exception:
+                result[futures[f]] = {}
+    _stock_hist_cache["data"] = result
+    _stock_hist_cache["ts"]   = now
+    return jsonify(result)
 
 
 @app.route("/api/holdings", methods=["GET"])
