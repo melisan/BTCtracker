@@ -527,6 +527,5 @@ document.getElementById("refresh-btn").addEventListener("click", async () => {
   await fetchCryptoPrices();
   await Promise.all([fetchHoldings(), fetchHistory(), fetchStockPrices()]);
   await checkAndBackfill();
-  setInterval(fetchCryptoPrices, 60_000);
-  setInterval(fetchStockPrices,  300_000);
+  setInterval(fetchStockPrices, 300_000);
 })();

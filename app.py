@@ -36,9 +36,8 @@ KOSPI = {
 
 VALID_TYPES = {"BTC", "ETH", "KRW"} | set(STOCKS.keys()) | set(KOSPI.keys())
 
-_price_cache = {"data": None, "ts": 0}
+_price_cache = {"data": None, "date": None}
 _stock_cache = {"data": None, "ts": 0}
-CRYPTO_TTL = 60
 STOCK_TTL  = 300
 
 
@@ -109,25 +108,24 @@ def query(conn, sql, params=None):
 # ── Price fetching ────────────────────────────────────────────
 
 def fetch_crypto_prices():
-    now = time.time()
-    if _price_cache["data"] and now - _price_cache["ts"] < CRYPTO_TTL:
+    today = datetime.utcnow().date().isoformat()
+    if _price_cache["data"] and _price_cache["date"] == today:
         return _price_cache["data"]
     resp = requests.get(
-        f"{COINGECKO_BASE}/simple/price",
-        params={"ids": "bitcoin,ethereum", "vs_currencies": "usd,krw"},
+        "https://api.upbit.com/v1/ticker",
+        params={"markets": "KRW-BTC,KRW-ETH,KRW-USDT"},
+        headers={"Accept": "application/json"},
         timeout=10,
     )
     resp.raise_for_status()
-    data    = resp.json()
-    btc_usd = data["bitcoin"]["usd"]
-    btc_krw = data["bitcoin"]["krw"]
-    result  = {
-        "btc":     data["bitcoin"]["krw"],
-        "eth":     data["ethereum"]["krw"],
-        "usd_krw": round(btc_krw / btc_usd, 2) if btc_usd else 1350,
+    items    = {item["market"]: float(item["trade_price"]) for item in resp.json()}
+    result   = {
+        "btc":     items.get("KRW-BTC",  0),
+        "eth":     items.get("KRW-ETH",  0),
+        "usd_krw": round(items.get("KRW-USDT", 1350), 2),
     }
     _price_cache["data"] = result
-    _price_cache["ts"]   = now
+    _price_cache["date"] = today
     return result
 
 
