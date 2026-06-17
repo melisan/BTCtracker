@@ -387,17 +387,20 @@ def api_stocks_history():
     now = time.time()
     if _stock_hist_cache["data"] and now - _stock_hist_cache["ts"] < STOCK_HIST_TTL:
         return jsonify(_stock_hist_cache["data"])
+    # app key → yfinance ticker (crypto needs -USD suffix)
+    yf_map = {**{t: t for t in STOCKS}, **{t: t for t in KOSPI},
+              "BTC": "BTC-USD", "ETH": "ETH-USD"}
     result = {}
-    def fetch_one(ticker):
+    def fetch_one(app_key, yf_ticker):
         import yfinance as yf
-        hist = yf.Ticker(ticker).history(period="35d", interval="1d")
-        return ticker, {d.strftime("%Y-%m-%d"): float(row["Close"]) for d, row in hist.iterrows()}
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futures = {ex.submit(fetch_one, t): t for t in STOCKS}
+        hist = yf.Ticker(yf_ticker).history(period="35d", interval="1d")
+        return app_key, {d.strftime("%Y-%m-%d"): float(row["Close"]) for d, row in hist.iterrows()}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(fetch_one, k, v): k for k, v in yf_map.items()}
         for f in as_completed(futures, timeout=30):
             try:
-                t, prices = f.result()
-                result[t] = prices
+                k, prices = f.result()
+                result[k] = prices
             except Exception:
                 result[futures[f]] = {}
     _stock_hist_cache["data"] = result

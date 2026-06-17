@@ -294,8 +294,9 @@ function renderLineChart(data) {
 
 async function fetchHistory() {
   try {
-    const res   = await fetch(`/api/portfolio/history?range=${activeRange}`);
-    historyData = await res.json();
+    const res = await fetch(`/api/portfolio/history?range=${activeRange}`);
+    const raw = await res.json();
+    historyData = raw.length > 1 ? raw.slice(0, -1) : raw;
     renderLineChart(historyData);
   } catch (err) { console.error("History fetch failed:", err); }
 }
@@ -357,7 +358,9 @@ function renderUSStocksChart() {
   const empty  = document.getElementById("us-chart-empty");
   if (!canvas) return;
 
-  const tickers = [...new Set(holdings.filter(h => STOCK_TYPES.has(h.asset_type)).map(h => h.asset_type))];
+  const ALL_CHART_TYPES = new Set([...STOCK_TYPES, ...KOSPI_TYPES, "BTC", "ETH"]);
+  const FIXED_COLOR = { "BTC": "#f7931a", "ETH": "#627eea", "005930.KS": "#ff6b6b", "000660.KS": "#79c0ff" };
+  const tickers = [...new Set(holdings.filter(h => ALL_CHART_TYPES.has(h.asset_type)).map(h => h.asset_type))];
   if (!tickers.length || !Object.keys(usHistoryData).length) {
     canvas.classList.add("hidden"); empty.classList.remove("hidden"); return;
   }
@@ -366,15 +369,16 @@ function renderUSStocksChart() {
   if (!allDates.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
   canvas.classList.remove("hidden"); empty.classList.add("hidden");
 
-  const datasets = tickers.map((t, i) => {
+  let usIdx = 0;
+  const datasets = tickers.map(t => {
     const prices = usHistoryData[t] || {};
     const vals   = allDates.map(d => prices[d] ?? null);
     const first  = vals.find(v => v != null) || 1;
+    const color  = FIXED_COLOR[t] || STOCK_COLORS[usIdx++ % STOCK_COLORS.length];
     return {
-      label: t,
+      label: KOSPI_BADGE[t] || t,
       data: vals.map(v => v != null ? parseFloat((v / first * 100).toFixed(2)) : null),
-      borderColor: STOCK_COLORS[i % STOCK_COLORS.length],
-      backgroundColor: "transparent",
+      borderColor: color, backgroundColor: "transparent",
       borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4,
       fill: false, tension: 0.3, spanGaps: false,
     };
