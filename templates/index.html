@@ -26,7 +26,6 @@
     <button class="tab-btn" data-tab="korean">Korean</button>
     <button class="tab-btn" data-tab="crypto">BTC / ETH</button>
     <button class="tab-btn" data-tab="krw">KRW</button>
-    <button class="tab-btn tab-locked" data-tab="entry">🔒 Entry</button>
   </nav>
 
   <!-- ── TOTAL TAB ── -->
@@ -122,12 +121,34 @@
     <div class="card">
       <div class="card-header">
         <h2>My US Holdings</h2>
-        <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="us-subtotal" class="subtotal-val">—</span></div>
+        <div class="header-actions">
+          <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="us-subtotal" class="subtotal-val">—</span></div>
+          <button id="us-add-btn" class="btn-add hidden">+ Add</button>
+          <button id="us-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
+        </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Shares</th><th>USD Value</th><th>KRW Value</th></tr></thead>
+        <thead><tr><th>Label</th><th>Shares</th><th>USD Value</th><th>KRW Value</th><th class="del-col"></th></tr></thead>
         <tbody id="us-tbody"><tr class="empty-row"><td colspan="4">No US stock holdings yet.</td></tr></tbody>
       </table>
+      <div id="us-add-form" class="add-form hidden">
+        <input id="us-new-label" type="text" placeholder="Label (e.g. Fidelity AAPL)" />
+        <select id="us-new-type">
+          <option value="AAPL">AAPL — Apple</option>
+          <option value="AMZN">AMZN — Amazon</option>
+          <option value="CVX">CVX — Chevron</option>
+          <option value="LLY">LLY — Eli Lilly</option>
+          <option value="GOOGL">GOOGL — Alphabet A</option>
+          <option value="GOOG">GOOG — Alphabet C</option>
+          <option value="NVO">NVO — Novo Nordisk</option>
+          <option value="OXY">OXY — Occidental</option>
+          <option value="MSTR">MSTR — MicroStrategy</option>
+          <option value="NVDA">NVDA — NVIDIA</option>
+        </select>
+        <input id="us-new-amount" type="number" placeholder="Shares" step="any" min="0" />
+        <button id="us-save-btn" class="btn-primary">Save</button>
+        <button id="us-cancel-btn" class="btn-secondary">Cancel</button>
+      </div>
     </div>
 
   </div>
@@ -142,12 +163,26 @@
     <div class="card">
       <div class="card-header">
         <h2>My Korean Holdings</h2>
-        <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="korean-subtotal" class="subtotal-val">—</span></div>
+        <div class="header-actions">
+          <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="korean-subtotal" class="subtotal-val">—</span></div>
+          <button id="korean-add-btn" class="btn-add hidden">+ Add</button>
+          <button id="korean-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
+        </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Shares</th><th>My Value (₩)</th></tr></thead>
+        <thead><tr><th>Label</th><th>Shares</th><th>My Value (₩)</th><th class="del-col"></th></tr></thead>
         <tbody id="korean-tbody"><tr class="empty-row"><td colspan="3">No Korean stock holdings yet.</td></tr></tbody>
       </table>
+      <div id="korean-add-form" class="add-form hidden">
+        <input id="korean-new-label" type="text" placeholder="Label (e.g. 삼성전자)" />
+        <select id="korean-new-type">
+          <option value="005930.KS">005930.KS — Samsung Electronics</option>
+          <option value="000660.KS">000660.KS — SK Hynix</option>
+        </select>
+        <input id="korean-new-amount" type="number" placeholder="Shares" step="any" min="0" />
+        <button id="korean-save-btn" class="btn-primary">Save</button>
+        <button id="korean-cancel-btn" class="btn-secondary">Cancel</button>
+      </div>
     </div>
 
   </div>
@@ -170,12 +205,26 @@
     <div class="card">
       <div class="card-header">
         <h2>My Crypto Holdings</h2>
-        <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="crypto-subtotal" class="subtotal-val">—</span></div>
+        <div class="header-actions">
+          <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="crypto-subtotal" class="subtotal-val">—</span></div>
+          <button id="crypto-add-btn" class="btn-add hidden">+ Add</button>
+          <button id="crypto-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
+        </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Asset</th><th>Amount</th><th>KRW Value</th></tr></thead>
+        <thead><tr><th>Label</th><th>Asset</th><th>Amount</th><th>KRW Value</th><th class="del-col"></th></tr></thead>
         <tbody id="crypto-tbody"><tr class="empty-row"><td colspan="4">No crypto holdings yet.</td></tr></tbody>
       </table>
+      <div id="crypto-add-form" class="add-form hidden">
+        <input id="crypto-new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
+        <select id="crypto-new-type">
+          <option value="BTC">BTC — Bitcoin</option>
+          <option value="ETH">ETH — Ethereum</option>
+        </select>
+        <input id="crypto-new-amount" type="number" placeholder="Amount" step="any" min="0" />
+        <button id="crypto-save-btn" class="btn-primary">Save</button>
+        <button id="crypto-cancel-btn" class="btn-secondary">Cancel</button>
+      </div>
     </div>
 
   </div>
@@ -185,56 +234,21 @@
     <div class="card">
       <div class="card-header">
         <h2>My KRW Holdings</h2>
-        <div class="subtotal-badge"><span class="subtotal-label">Total</span><span id="krw-subtotal" class="subtotal-val">—</span></div>
+        <div class="header-actions">
+          <div class="subtotal-badge"><span class="subtotal-label">Total</span><span id="krw-subtotal" class="subtotal-val">—</span></div>
+          <button id="krw-add-btn" class="btn-add hidden">+ Add</button>
+          <button id="krw-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
+        </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Amount (₩)</th></tr></thead>
+        <thead><tr><th>Label</th><th>Amount (₩)</th><th class="del-col"></th></tr></thead>
         <tbody id="krw-tbody"><tr class="empty-row"><td colspan="2">No KRW holdings yet.</td></tr></tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- ── ENTRY TAB (admin-locked) ── -->
-  <div id="tab-entry" class="tab-panel hidden">
-    <div class="card">
-      <div class="card-header">
-        <h2>Manage All Assets</h2>
-        <button id="add-btn" class="btn-add">+ Add Entry</button>
-      </div>
-      <table class="table">
-        <thead>
-          <tr><th>Label</th><th>Type</th><th>Amount <span class="hint">(click to edit)</span></th><th>KRW Value</th><th></th></tr>
-        </thead>
-        <tbody id="entry-tbody"><tr class="empty-row"><td colspan="5">No assets yet.</td></tr></tbody>
-      </table>
-      <div id="add-form" class="add-form hidden">
-        <input id="new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
-        <select id="new-type">
-          <optgroup label="Crypto / Cash">
-            <option value="BTC">BTC — Bitcoin</option>
-            <option value="ETH">ETH — Ethereum</option>
-            <option value="KRW">KRW — Korean Won</option>
-          </optgroup>
-          <optgroup label="US Stocks">
-            <option value="AAPL">AAPL — Apple</option>
-            <option value="AMZN">AMZN — Amazon</option>
-            <option value="CVX">CVX — Chevron</option>
-            <option value="LLY">LLY — Eli Lilly</option>
-            <option value="GOOGL">GOOGL — Alphabet A</option>
-            <option value="GOOG">GOOG — Alphabet C</option>
-            <option value="NVO">NVO — Novo Nordisk</option>
-            <option value="OXY">OXY — Occidental</option>
-            <option value="MSTR">MSTR — MicroStrategy</option>
-            <option value="NVDA">NVDA — NVIDIA</option>
-          </optgroup>
-          <optgroup label="KOSPI">
-            <option value="005930.KS">005930.KS — Samsung Electronics</option>
-            <option value="000660.KS">000660.KS — SK Hynix</option>
-          </optgroup>
-        </select>
-        <input id="new-amount" type="number" placeholder="Amount / Shares" step="any" min="0" />
-        <button id="save-new-btn" class="btn-primary">Save</button>
-        <button id="cancel-new-btn" class="btn-secondary">Cancel</button>
+      <div id="krw-add-form" class="add-form hidden">
+        <input id="krw-new-label" type="text" placeholder="Label (e.g. Kakao Bank)" />
+        <input id="krw-new-amount" type="number" placeholder="Amount (₩)" step="any" min="0" />
+        <button id="krw-save-btn" class="btn-primary">Save</button>
+        <button id="krw-cancel-btn" class="btn-secondary">Cancel</button>
       </div>
     </div>
   </div>

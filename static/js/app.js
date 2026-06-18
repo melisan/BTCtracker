@@ -28,6 +28,7 @@ let normalizeMode   = false;
 let historyData     = [];
 let usHistoryData   = {};
 let isAuthenticated = false;
+let editMode        = false;
 let togglesWired    = false;
 
 // ── Breakdown (live) ─────────────────────────────────────────
@@ -58,7 +59,6 @@ function calcKRW(h) {
 
 // ── Tab switching ─────────────────────────────────────────────
 function switchTab(tab) {
-  if (tab === "entry" && !isAuthenticated) { showAuthModal(tab); return; }
   activeTab = tab;
   document.querySelectorAll(".tab-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === tab));
@@ -70,7 +70,7 @@ document.querySelectorAll(".tab-btn").forEach(btn =>
   btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
 // ── Auth Modal ────────────────────────────────────────────────
-function showAuthModal(targetTab) {
+function showAuthModal(onSuccess) {
   const modal = document.getElementById("auth-modal");
   modal.classList.remove("hidden");
   document.getElementById("auth-pw").value = "";
@@ -84,7 +84,7 @@ function showAuthModal(targetTab) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: pw }),
     });
-    if (res.ok) { isAuthenticated = true; cleanup(); switchTab(targetTab); }
+    if (res.ok) { isAuthenticated = true; cleanup(); if (onSuccess) onSuccess(); }
     else { document.getElementById("auth-error").classList.remove("hidden"); document.getElementById("auth-pw").select(); }
   };
   document.getElementById("auth-pw").onkeydown = e => {
@@ -134,7 +134,6 @@ function renderActiveTab() {
   if (activeTab === "korean") renderKoreanTab();
   if (activeTab === "crypto") renderCryptoTab();
   if (activeTab === "krw")    renderKRWTab();
-  if (activeTab === "entry")  renderEntryTab();
 }
 
 // ── Summary Cards ─────────────────────────────────────────────
@@ -409,10 +408,29 @@ function renderUSStocksChart() {
   });
 }
 
+// ── Edit-mode helpers ─────────────────────────────────────────
+function setLockBtn(id) {
+  const btn = document.getElementById(id);
+  if (btn) { btn.textContent = editMode ? "🔓" : "🔒"; btn.classList.toggle("active", editMode); }
+}
+function editRow(cells, delId) {
+  return editMode
+    ? `${cells}<td><button class="btn-del" data-id="${delId}">✕</button></td>`
+    : `${cells}<td></td>`;
+}
+function wireEditRows(tbody) {
+  if (!editMode) return;
+  tbody.querySelectorAll(".amount-cell").forEach(c => c.addEventListener("click", startEdit));
+  tbody.querySelectorAll(".btn-del").forEach(b => b.addEventListener("click", () => deleteHolding(+b.dataset.id)));
+}
+
 // ── US Stocks Tab ─────────────────────────────────────────────
 function renderUSTab() {
   const usd_krw = cryptoPrices.usd_krw || 1350;
   document.getElementById("us-usd-krw").textContent = fmtKRW.format(usd_krw);
+  setLockBtn("us-lock-btn");
+  document.getElementById("us-add-btn")?.classList.toggle("hidden", !editMode);
+
   if (!Object.keys(usHistoryData).length) fetchUSHistory();
   else renderUSStocksChart();
 
@@ -420,41 +438,46 @@ function renderUSTab() {
   let total   = 0;
   const tbody = document.getElementById("us-tbody");
   if (!usH.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No US stock holdings yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No US stock holdings yet.</td></tr>';
   } else {
     tbody.innerHTML = usH.map(h => {
       const usd = stockData.prices?.[h.asset_type] || 0;
       const krw = h.amount * usd * usd_krw;
       total += krw;
-      return `<tr>
-        <td>${escHtml(h.label)}</td>
-        <td>${fmtNum(h.amount)}</td>
+      const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
+      return `<tr>${editRow(
+        `<td>${escHtml(h.label)}</td>
+        <td ${amtAttrs}>${fmtNum(h.amount)}</td>
         <td class="krw-muted">${usd ? fmtUSD.format(h.amount * usd) : "—"}</td>
-        <td>${fmtKRW.format(krw)}</td>
-      </tr>`;
+        <td>${fmtKRW.format(krw)}</td>`, h.id)}`;
     }).join("");
+    wireEditRows(tbody);
   }
   document.getElementById("us-subtotal").textContent = fmtKRW.format(total);
 }
 
 // ── Korean Tab ────────────────────────────────────────────────
 function renderKoreanTab() {
+  setLockBtn("korean-lock-btn");
+  document.getElementById("korean-add-btn")?.classList.toggle("hidden", !editMode);
+
   const kH    = holdings.filter(h => KOSPI_TYPES.has(h.asset_type));
   let total   = 0;
   const tbody = document.getElementById("korean-tbody");
   if (!kH.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No Korean stock holdings yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No Korean stock holdings yet.</td></tr>';
   } else {
     tbody.innerHTML = kH.map(h => {
       const p   = stockData.kospi_prices?.[h.asset_type] || 0;
       const krw = h.amount * p;
       total += krw;
-      return `<tr>
-        <td>${escHtml(h.label)}</td>
-        <td>${fmtNum(h.amount)}</td>
-        <td>${fmtKRW.format(krw)}</td>
-      </tr>`;
+      const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
+      return `<tr>${editRow(
+        `<td>${escHtml(h.label)}</td>
+        <td ${amtAttrs}>${fmtNum(h.amount)}</td>
+        <td>${fmtKRW.format(krw)}</td>`, h.id)}`;
     }).join("");
+    wireEditRows(tbody);
   }
   document.getElementById("korean-subtotal").textContent = fmtKRW.format(total);
 }
@@ -464,66 +487,52 @@ function renderCryptoTab() {
   document.getElementById("crypto-btc-price").textContent = fmtKRW.format(cryptoPrices.btc);
   document.getElementById("crypto-eth-price").textContent = fmtKRW.format(cryptoPrices.eth);
   document.getElementById("crypto-ts").textContent = "Updated " + new Date().toLocaleTimeString();
+  setLockBtn("crypto-lock-btn");
+  document.getElementById("crypto-add-btn")?.classList.toggle("hidden", !editMode);
 
   const cH    = holdings.filter(h => h.asset_type === "BTC" || h.asset_type === "ETH");
   let total   = 0;
   const tbody = document.getElementById("crypto-tbody");
   if (!cH.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No crypto holdings yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No crypto holdings yet.</td></tr>';
   } else {
     tbody.innerHTML = cH.map(h => {
       const krw = calcKRW(h);
       total += krw;
       const cls = h.asset_type === "BTC" ? "badge-btc" : "badge-eth";
-      return `<tr>
-        <td>${escHtml(h.label)}</td>
+      const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
+      return `<tr>${editRow(
+        `<td>${escHtml(h.label)}</td>
         <td><span class="badge ${cls}">${h.asset_type}</span></td>
-        <td>${fmtNum(h.amount)}</td>
-        <td>${fmtKRW.format(krw)}</td>
-      </tr>`;
+        <td ${amtAttrs}>${fmtNum(h.amount)}</td>
+        <td>${fmtKRW.format(krw)}</td>`, h.id)}`;
     }).join("");
+    wireEditRows(tbody);
   }
   document.getElementById("crypto-subtotal").textContent = fmtKRW.format(total);
 }
 
 // ── KRW Tab ───────────────────────────────────────────────────
 function renderKRWTab() {
+  setLockBtn("krw-lock-btn");
+  document.getElementById("krw-add-btn")?.classList.toggle("hidden", !editMode);
+
   const kH    = holdings.filter(h => h.asset_type === "KRW");
   let total   = 0;
   const tbody = document.getElementById("krw-tbody");
   if (!kH.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="2">No KRW holdings yet.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No KRW holdings yet.</td></tr>';
   } else {
     tbody.innerHTML = kH.map(h => {
       total += h.amount;
-      return `<tr><td>${escHtml(h.label)}</td><td>${fmtKRW.format(h.amount)}</td></tr>`;
+      const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
+      return `<tr>${editRow(
+        `<td>${escHtml(h.label)}</td>
+        <td ${amtAttrs}>${fmtKRW.format(h.amount)}</td>`, h.id)}`;
     }).join("");
+    wireEditRows(tbody);
   }
   document.getElementById("krw-subtotal").textContent = fmtKRW.format(total);
-}
-
-// ── Entry Tab ─────────────────────────────────────────────────
-function renderEntryTab() {
-  const tbody = document.getElementById("entry-tbody");
-  if (!holdings.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No assets yet.</td></tr>'; return;
-  }
-  tbody.innerHTML = holdings.map(h => {
-    const krw     = calcKRW(h);
-    const isKospi = KOSPI_TYPES.has(h.asset_type);
-    const isStock = STOCK_TYPES.has(h.asset_type);
-    const lbl     = isKospi ? (KOSPI_BADGE[h.asset_type] ?? h.asset_type) : h.asset_type;
-    const cls     = isKospi ? "badge-kospi" : isStock ? "badge-stock" : `badge-${h.asset_type.toLowerCase()}`;
-    return `<tr data-id="${h.id}">
-      <td>${escHtml(h.label)}</td>
-      <td><span class="badge ${cls}">${lbl}</span></td>
-      <td class="amount-cell" data-id="${h.id}" data-amount="${h.amount}">${fmtNum(h.amount)}</td>
-      <td class="krw-muted">${fmtKRW.format(krw)}</td>
-      <td><button class="btn-del" data-id="${h.id}">✕</button></td>
-    </tr>`;
-  }).join("");
-  tbody.querySelectorAll(".amount-cell").forEach(c => c.addEventListener("click", startEdit));
-  tbody.querySelectorAll(".btn-del").forEach(b => b.addEventListener("click", () => deleteHolding(+b.dataset.id)));
 }
 
 // ── Inline edit ───────────────────────────────────────────────
@@ -562,32 +571,55 @@ async function deleteHolding(id) {
   await Promise.all([fetchHoldings(), fetchHistory()]);
 }
 
-// ── Add Entry Form ────────────────────────────────────────────
-document.getElementById("add-btn").addEventListener("click", () => {
-  document.getElementById("add-form").classList.remove("hidden");
-  document.getElementById("new-label").focus();
-});
-document.getElementById("cancel-new-btn").addEventListener("click", () => {
-  document.getElementById("add-form").classList.add("hidden"); clearAddForm();
-});
-document.getElementById("save-new-btn").addEventListener("click", async () => {
-  const label      = document.getElementById("new-label").value.trim();
-  const asset_type = document.getElementById("new-type").value;
-  const amount     = parseFloat(document.getElementById("new-amount").value);
-  if (!label || isNaN(amount) || amount < 0) { alert("Please enter a label and a valid amount."); return; }
-  await fetch("/api/holdings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, asset_type, amount }),
+// ── Lock buttons ──────────────────────────────────────────────
+document.querySelectorAll(".btn-edit-lock").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!isAuthenticated) {
+      showAuthModal(() => { editMode = true; renderActiveTab(); });
+    } else {
+      editMode = !editMode;
+      if (!editMode) ["us","korean","crypto","krw"].forEach(p =>
+        document.getElementById(`${p}-add-form`)?.classList.add("hidden"));
+      renderActiveTab();
+    }
   });
-  document.getElementById("add-form").classList.add("hidden");
-  clearAddForm();
-  await Promise.all([fetchHoldings(), fetchHistory()]);
 });
-function clearAddForm() {
-  document.getElementById("new-label").value  = "";
-  document.getElementById("new-amount").value = "";
-  document.getElementById("new-type").value   = "BTC";
+
+// ── Per-tab add forms ─────────────────────────────────────────
+function wireAddForm(prefix, fixedType) {
+  const form     = document.getElementById(`${prefix}-add-form`);
+  const labelEl  = document.getElementById(`${prefix}-new-label`);
+  const typeEl   = document.getElementById(`${prefix}-new-type`);
+  const amountEl = document.getElementById(`${prefix}-new-amount`);
+  document.getElementById(`${prefix}-add-btn`)?.addEventListener("click", () => {
+    form?.classList.remove("hidden"); labelEl?.focus();
+  });
+  document.getElementById(`${prefix}-cancel-btn`)?.addEventListener("click", () => {
+    form?.classList.add("hidden");
+    if (labelEl)  labelEl.value  = "";
+    if (amountEl) amountEl.value = "";
+    if (typeEl)   typeEl.selectedIndex = 0;
+  });
+  document.getElementById(`${prefix}-save-btn`)?.addEventListener("click", async () => {
+    const label      = labelEl?.value.trim();
+    const asset_type = typeEl ? typeEl.value : fixedType;
+    const amount     = parseFloat(amountEl?.value);
+    if (!label || isNaN(amount) || amount < 0) { alert("Enter a label and valid amount."); return; }
+    await fetch("/api/holdings", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label, asset_type, amount }),
+    });
+    form?.classList.add("hidden");
+    if (labelEl)  labelEl.value  = "";
+    if (amountEl) amountEl.value = "";
+    if (typeEl)   typeEl.selectedIndex = 0;
+    await Promise.all([fetchHoldings(), fetchHistory()]);
+  });
 }
+wireAddForm("us");
+wireAddForm("korean");
+wireAddForm("crypto");
+wireAddForm("krw", "KRW");
 
 // ── Refresh button ────────────────────────────────────────────
 document.getElementById("refresh-btn").addEventListener("click", async () => {
