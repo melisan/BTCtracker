@@ -18,20 +18,23 @@
     <div class="logo-row">
       <span class="logo">✝</span>
       <div class="title-stack">
-        <h1>Harvest Portfolio</h1>
-        <span class="tagline">Faithful stewardship of every blessing</span>
+        <h1 data-i18n="app_title">Harvest Portfolio</h1>
+        <span class="tagline" data-i18n="app_tagline">Faithful stewardship of every blessing</span>
       </div>
     </div>
-    <button id="refresh-btn" class="btn-icon" title="Refresh all prices">⟳</button>
+    <div class="header-right">
+      <button id="lang-btn" class="btn-icon btn-lang" title="한국어 / English">한</button>
+      <button id="refresh-btn" class="btn-icon" title="Refresh all prices">⟳</button>
+    </div>
   </header>
 
   <!-- Tab bar -->
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="total">🌳 Overview</button>
-    <button class="tab-btn" data-tab="us">📈 US Stocks</button>
-    <button class="tab-btn" data-tab="korean">🌸 Korean</button>
-    <button class="tab-btn" data-tab="crypto">₿ Crypto</button>
-    <button class="tab-btn" data-tab="krw">🐷 KRW</button>
+    <button class="tab-btn active" data-tab="total" data-i18n="tab_total">🌳 Overview</button>
+    <button class="tab-btn" data-tab="us" data-i18n="tab_us">📈 US Stocks</button>
+    <button class="tab-btn" data-tab="korean" data-i18n="tab_korean">🌸 Korean</button>
+    <button class="tab-btn" data-tab="crypto" data-i18n="tab_crypto">₿ Crypto</button>
+    <button class="tab-btn" data-tab="krw" data-i18n="tab_krw">🐷 KRW</button>
   </nav>
 
   <!-- ── TOTAL TAB ── -->
@@ -39,27 +42,27 @@
 
     <div class="summary-grid">
       <div class="scard scard-total">
-        <div class="scard-label">Total Harvest</div>
+        <div class="scard-label" data-i18n="scard_total">Total Harvest</div>
         <div id="sum-total" class="scard-value">—</div>
       </div>
       <div class="scard scard-btc">
-        <div class="scard-label">₿ Bitcoin</div>
+        <div class="scard-label" data-i18n="scard_btc">₿ Bitcoin</div>
         <div id="sum-btc" class="scard-value">—</div>
       </div>
       <div class="scard scard-eth">
-        <div class="scard-label">Ξ Ethereum</div>
+        <div class="scard-label" data-i18n="scard_eth">Ξ Ethereum</div>
         <div id="sum-eth" class="scard-value">—</div>
       </div>
       <div class="scard scard-us">
-        <div class="scard-label">📈 US Stocks</div>
+        <div class="scard-label" data-i18n="scard_us">📈 US Stocks</div>
         <div id="sum-us" class="scard-value">—</div>
       </div>
       <div class="scard scard-korean">
-        <div class="scard-label">🌸 Korean</div>
+        <div class="scard-label" data-i18n="scard_korean">🌸 Korean</div>
         <div id="sum-korean" class="scard-value">—</div>
       </div>
       <div class="scard scard-krw">
-        <div class="scard-label">🐷 KRW Cash</div>
+        <div class="scard-label" data-i18n="scard_krw">🐷 KRW Cash</div>
         <div id="sum-krw" class="scard-value">—</div>
       </div>
     </div>
@@ -71,7 +74,7 @@
     <div class="charts-row">
       <!-- Pie / Donut chart -->
       <div class="card pie-card">
-        <h2>Harvest Allocation</h2>
+        <h2 data-i18n="chart_alloc">Harvest Allocation</h2>
         <div class="pie-wrap">
           <canvas id="pie-chart"></canvas>
         </div>
@@ -81,7 +84,7 @@
       <!-- Multi-line history chart -->
       <div class="card line-card">
         <div class="card-header">
-          <h2>Growth Over Time 🌳</h2>
+          <h2 data-i18n="chart_growth">Growth Over Time 🌳</h2>
           <div class="chart-controls">
             <div class="range-btns">
               <button class="range-btn active" data-range="daily">30D</button>
@@ -110,35 +113,35 @@
 
     <div class="price-strip">
       <div class="price-chip">
-        <span class="chip-label">USD / KRW</span>
+        <span class="chip-label" data-i18n="lbl_usd_krw">USD / KRW</span>
         <span id="us-usd-krw" class="chip-val">—</span>
       </div>
       <span id="stock-ts" class="ts ml-auto"></span>
     </div>
 
     <div class="card">
-      <h2>30-Day Price Performance 📈</h2>
+      <h2 data-i18n="chart_us_perf">30-Day Price Performance 📈</h2>
       <div class="us-chart-wrap">
-        <div id="us-chart-empty" class="chart-empty">Add US stock holdings to see price charts.</div>
+        <div id="us-chart-empty" class="chart-empty" data-i18n="empty_us_chart">Add US stock holdings to see price charts.</div>
         <canvas id="us-stocks-chart" class="hidden"></canvas>
       </div>
     </div>
 
     <div class="card">
       <div class="card-header">
-        <h2>My US Holdings 🌿</h2>
+        <h2 data-i18n="h2_us">My US Holdings 🌿</h2>
         <div class="header-actions">
-          <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="us-subtotal" class="subtotal-val">—</span></div>
-          <button id="us-add-btn" class="btn-add hidden">+ Add</button>
+          <div class="subtotal-badge"><span class="subtotal-label" data-i18n="lbl_subtotal">Subtotal</span><span id="us-subtotal" class="subtotal-val">—</span></div>
+          <button id="us-add-btn" class="btn-add hidden" data-i18n="btn_add">+ Add</button>
           <button id="us-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
         </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Shares</th><th>USD Value</th><th>KRW Value</th><th class="del-col"></th></tr></thead>
-        <tbody id="us-tbody"><tr class="empty-row"><td colspan="4">No US stock holdings yet.</td></tr></tbody>
+        <thead><tr><th data-i18n="th_label">Label</th><th data-i18n="th_shares">Shares</th><th data-i18n="th_usd_val">USD Value</th><th data-i18n="th_krw_val">KRW Value</th><th class="del-col"></th></tr></thead>
+        <tbody id="us-tbody"><tr class="empty-row"><td colspan="5">No US stock holdings yet.</td></tr></tbody>
       </table>
       <div id="us-add-form" class="add-form hidden">
-        <input id="us-new-label" type="text" placeholder="Label (e.g. Fidelity AAPL)" />
+        <input id="us-new-label" type="text" placeholder="Label (e.g. Fidelity AAPL)" data-i18n-placeholder="ph_us_label" />
         <select id="us-new-type">
           <option value="AAPL">AAPL — Apple</option>
           <option value="AMZN">AMZN — Amazon</option>
@@ -151,9 +154,9 @@
           <option value="MSTR">MSTR — MicroStrategy</option>
           <option value="NVDA">NVDA — NVIDIA</option>
         </select>
-        <input id="us-new-amount" type="number" placeholder="Shares" step="any" min="0" />
-        <button id="us-save-btn" class="btn-primary">Save</button>
-        <button id="us-cancel-btn" class="btn-secondary">Cancel</button>
+        <input id="us-new-amount" type="number" placeholder="Shares" step="any" min="0" data-i18n-placeholder="ph_us_amount" />
+        <button id="us-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="us-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
 
@@ -168,26 +171,26 @@
 
     <div class="card">
       <div class="card-header">
-        <h2>My Korean Holdings 🌸</h2>
+        <h2 data-i18n="h2_korean">My Korean Holdings 🌸</h2>
         <div class="header-actions">
-          <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="korean-subtotal" class="subtotal-val">—</span></div>
-          <button id="korean-add-btn" class="btn-add hidden">+ Add</button>
+          <div class="subtotal-badge"><span class="subtotal-label" data-i18n="lbl_subtotal">Subtotal</span><span id="korean-subtotal" class="subtotal-val">—</span></div>
+          <button id="korean-add-btn" class="btn-add hidden" data-i18n="btn_add">+ Add</button>
           <button id="korean-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
         </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Shares</th><th>My Value (₩)</th><th class="del-col"></th></tr></thead>
-        <tbody id="korean-tbody"><tr class="empty-row"><td colspan="3">No Korean stock holdings yet.</td></tr></tbody>
+        <thead><tr><th data-i18n="th_label">Label</th><th data-i18n="th_shares">Shares</th><th data-i18n="th_my_val">My Value (₩)</th><th class="del-col"></th></tr></thead>
+        <tbody id="korean-tbody"><tr class="empty-row"><td colspan="4">No Korean stock holdings yet.</td></tr></tbody>
       </table>
       <div id="korean-add-form" class="add-form hidden">
-        <input id="korean-new-label" type="text" placeholder="Label (e.g. 삼성전자)" />
+        <input id="korean-new-label" type="text" placeholder="Label (e.g. 삼성전자)" data-i18n-placeholder="ph_korean_label" />
         <select id="korean-new-type">
           <option value="005930.KS">005930.KS — Samsung Electronics</option>
           <option value="000660.KS">000660.KS — SK Hynix</option>
         </select>
-        <input id="korean-new-amount" type="number" placeholder="Shares" step="any" min="0" />
-        <button id="korean-save-btn" class="btn-primary">Save</button>
-        <button id="korean-cancel-btn" class="btn-secondary">Cancel</button>
+        <input id="korean-new-amount" type="number" placeholder="Shares" step="any" min="0" data-i18n-placeholder="ph_korean_amount" />
+        <button id="korean-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="korean-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
 
@@ -209,27 +212,35 @@
     </div>
 
     <div class="card">
+      <h2 data-i18n="chart_crypto_perf">30-Day Crypto Performance ₿</h2>
+      <div class="crypto-chart-wrap">
+        <div id="crypto-chart-empty" class="chart-empty" data-i18n="empty_crypto_chart">Add crypto holdings to see price chart.</div>
+        <canvas id="crypto-price-chart" class="hidden"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-header">
-        <h2>My Crypto Holdings ₿</h2>
+        <h2 data-i18n="h2_crypto">My Crypto Holdings ₿</h2>
         <div class="header-actions">
-          <div class="subtotal-badge"><span class="subtotal-label">Subtotal</span><span id="crypto-subtotal" class="subtotal-val">—</span></div>
-          <button id="crypto-add-btn" class="btn-add hidden">+ Add</button>
+          <div class="subtotal-badge"><span class="subtotal-label" data-i18n="lbl_subtotal">Subtotal</span><span id="crypto-subtotal" class="subtotal-val">—</span></div>
+          <button id="crypto-add-btn" class="btn-add hidden" data-i18n="btn_add">+ Add</button>
           <button id="crypto-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
         </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Asset</th><th>Amount</th><th>KRW Value</th><th class="del-col"></th></tr></thead>
-        <tbody id="crypto-tbody"><tr class="empty-row"><td colspan="4">No crypto holdings yet.</td></tr></tbody>
+        <thead><tr><th data-i18n="th_label">Label</th><th data-i18n="th_asset">Asset</th><th data-i18n="th_amount">Amount</th><th data-i18n="th_krw_val">KRW Value</th><th class="del-col"></th></tr></thead>
+        <tbody id="crypto-tbody"><tr class="empty-row"><td colspan="5">No crypto holdings yet.</td></tr></tbody>
       </table>
       <div id="crypto-add-form" class="add-form hidden">
-        <input id="crypto-new-label" type="text" placeholder="Label (e.g. Upbit BTC)" />
+        <input id="crypto-new-label" type="text" placeholder="Label (e.g. Upbit BTC)" data-i18n-placeholder="ph_crypto_label" />
         <select id="crypto-new-type">
           <option value="BTC">BTC — Bitcoin</option>
           <option value="ETH">ETH — Ethereum</option>
         </select>
-        <input id="crypto-new-amount" type="number" placeholder="Amount" step="any" min="0" />
-        <button id="crypto-save-btn" class="btn-primary">Save</button>
-        <button id="crypto-cancel-btn" class="btn-secondary">Cancel</button>
+        <input id="crypto-new-amount" type="number" placeholder="Amount" step="any" min="0" data-i18n-placeholder="ph_crypto_amount" />
+        <button id="crypto-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="crypto-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
 
@@ -239,30 +250,30 @@
   <div id="tab-krw" class="tab-panel hidden">
     <div class="card">
       <div class="card-header">
-        <h2>My KRW Holdings 🐷</h2>
+        <h2 data-i18n="h2_krw">My KRW Holdings 🐷</h2>
         <div class="header-actions">
-          <div class="subtotal-badge"><span class="subtotal-label">Total</span><span id="krw-subtotal" class="subtotal-val">—</span></div>
-          <button id="krw-add-btn" class="btn-add hidden">+ Add</button>
+          <div class="subtotal-badge"><span class="subtotal-label" data-i18n="lbl_total">Total</span><span id="krw-subtotal" class="subtotal-val">—</span></div>
+          <button id="krw-add-btn" class="btn-add hidden" data-i18n="btn_add">+ Add</button>
           <button id="krw-lock-btn" class="btn-edit-lock" title="Edit holdings">🔒</button>
         </div>
       </div>
       <table class="table">
-        <thead><tr><th>Label</th><th>Amount (₩)</th><th class="del-col"></th></tr></thead>
-        <tbody id="krw-tbody"><tr class="empty-row"><td colspan="2">No KRW holdings yet.</td></tr></tbody>
+        <thead><tr><th data-i18n="th_label">Label</th><th data-i18n="th_amount_krw">Amount (₩)</th><th class="del-col"></th></tr></thead>
+        <tbody id="krw-tbody"><tr class="empty-row"><td colspan="3">No KRW holdings yet.</td></tr></tbody>
       </table>
       <div id="krw-add-form" class="add-form hidden">
-        <input id="krw-new-label" type="text" placeholder="Label (e.g. Kakao Bank)" />
-        <input id="krw-new-amount" type="number" placeholder="Amount (₩)" step="any" min="0" />
-        <button id="krw-save-btn" class="btn-primary">Save</button>
-        <button id="krw-cancel-btn" class="btn-secondary">Cancel</button>
+        <input id="krw-new-label" type="text" placeholder="Label (e.g. Kakao Bank)" data-i18n-placeholder="ph_krw_label" />
+        <input id="krw-new-amount" type="number" placeholder="Amount (₩)" step="any" min="0" data-i18n-placeholder="ph_krw_amount" />
+        <button id="krw-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="krw-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
   </div>
 
   <footer class="app-footer">
     <span class="footer-cross">✝</span>
-    <p class="footer-verse">"The blessing of the LORD brings wealth, and He adds no trouble to it."</p>
-    <span class="footer-ref">Proverbs 10:22</span>
+    <p class="footer-verse" data-i18n="footer_verse">"The blessing of the LORD brings wealth, and He adds no trouble to it."</p>
+    <span class="footer-ref" data-i18n="footer_ref">Proverbs 10:22</span>
   </footer>
 
 </div><!-- /app -->
@@ -271,12 +282,12 @@
 <div id="auth-modal" class="modal hidden">
   <div class="modal-backdrop"></div>
   <div class="modal-box">
-    <div class="modal-title">🔒 Admin Access</div>
-    <input id="auth-pw" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+    <div class="modal-title" data-i18n="auth_title">🔒 Admin Access</div>
+    <input id="auth-pw" type="password" placeholder="Enter admin password" autocomplete="current-password" data-i18n-placeholder="ph_auth_pw" />
     <div id="auth-error" class="auth-error hidden">Incorrect password</div>
     <div class="modal-btns">
-      <button id="auth-submit" class="btn-primary">Unlock</button>
-      <button id="auth-cancel" class="btn-secondary">Cancel</button>
+      <button id="auth-submit" class="btn-primary" data-i18n="btn_unlock">Unlock</button>
+      <button id="auth-cancel" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
     </div>
   </div>
 </div>

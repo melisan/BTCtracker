@@ -41,6 +41,8 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 .title-stack { display: flex; flex-direction: column; gap: 0.1rem; }
 .tagline { font-family: 'Lora', Georgia, serif; font-style: italic; font-size: 0.62rem; color: var(--text-muted); letter-spacing: 0.05em; }
 
+.header-right { display: flex; align-items: center; gap: 0.5rem; }
+
 .btn-icon {
   background: #21262d; border: 1px solid #30363d; color: #8b949e;
   font-size: 1.15rem; width: 34px; height: 34px; border-radius: 8px;
@@ -48,6 +50,8 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
   transition: all 0.15s;
 }
 .btn-icon:hover { border-color: #58a6ff; color: #58a6ff; }
+.btn-lang { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; color: var(--gold); border-color: rgba(232,184,75,0.3); }
+.btn-lang:hover { border-color: var(--gold) !important; color: var(--gold-light) !important; }
 
 /* ── Tabs ── */
 .tabs {
@@ -202,6 +206,10 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 /* ── US stocks history chart ── */
 .us-chart-wrap { position: relative; height: 220px; }
 .us-chart-wrap canvas { height: 100% !important; }
+
+/* ── Crypto history chart ── */
+.crypto-chart-wrap { position: relative; height: 220px; }
+.crypto-chart-wrap canvas { height: 100% !important; }
 
 /* ── Price strip ── */
 .price-strip {
