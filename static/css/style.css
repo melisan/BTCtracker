@@ -405,6 +405,73 @@ canvas { width: 100% !important; }
 .modal-btns .btn-primary, .modal-btns .btn-secondary { flex: 1; justify-content: center; }
 .auth-error { font-size: 0.8rem; color: #f85149; text-align: center; }
 
+/* ── Retirement Tab ── */
+.ret-summary-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem; margin-bottom: 1.25rem;
+}
+.scard-ret-kw    { border-color: rgba(232,184,75,0.3); }
+.scard-ret-kw    .scard-value { color: var(--gold); }
+.scard-ret-sk    { border-color: rgba(76,175,125,0.3); }
+.scard-ret-sk    .scard-value { color: var(--green); }
+.scard-ret-time  { border-color: rgba(126,184,247,0.2); }
+.scard-ret-time  .scard-value { color: var(--blue); font-size: 1rem; }
+.scard-ret-total { border-color: rgba(232,184,75,0.5); border-left: 3px solid var(--gold); }
+.scard-ret-total .scard-value { color: var(--gold-light); font-size: 1.2rem; }
+
+.ret-params-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  gap: 0.6rem 1rem; margin-bottom: 0.85rem;
+}
+.ret-plabel {
+  font-size: 0.65rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem;
+}
+.ret-pval { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+
+.ret-progress-section { margin: 0.75rem 0; }
+.ret-progress-meta {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 0.35rem;
+}
+.ret-prog-status { font-size: 0.72rem; color: var(--text-muted); }
+.ret-prog-pct    { font-size: 0.72rem; font-weight: 700; color: var(--text-mid); }
+.ret-track {
+  height: 9px; border-radius: 5px;
+  background: var(--border-sub); overflow: hidden;
+}
+.ret-bar {
+  height: 100%; border-radius: 5px;
+  transition: width 0.8s cubic-bezier(.25,.8,.25,1);
+}
+.ret-bar-green { background: linear-gradient(90deg, var(--green), #6dd5a0); }
+.ret-bar-coral { background: linear-gradient(90deg, var(--coral), #f0a898); }
+
+.ret-result-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0.8rem 0; margin-top: 0.5rem;
+  border-top: 1px solid var(--border-sub);
+}
+.ret-result-label { font-family: 'Lora', Georgia, serif; font-size: 0.8rem; color: var(--text-muted); }
+.ret-result-val   { font-size: 1.5rem; font-weight: 700; color: var(--gold); }
+
+.ret-proj-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem 1rem; margin: 0.85rem 0;
+}
+.ret-proj-cell { }
+.ret-proj-highlight .ret-result-val { font-size: 1.3rem; }
+.ret-proj-highlight .ret-plabel { color: var(--gold); }
+
+.ret-note {
+  font-size: 0.67rem; color: #5a5040; line-height: 1.55;
+  margin-top: 0.85rem; padding-top: 0.75rem;
+  border-top: 1px solid var(--border-sub);
+}
+
+.form-lbl { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+.form-sep  { font-size: 0.8rem;  color: var(--text-muted); }
+
 /* ── Scard hover ── */
 @keyframes faithGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(232,184,75,0); }
@@ -430,6 +497,9 @@ canvas { width: 100% !important; }
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .summary-grid { grid-template-columns: repeat(3, 1fr); }
+  .ret-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .ret-params-grid  { grid-template-columns: repeat(3, 1fr); }
+  .ret-proj-grid    { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
   .charts-row { grid-template-columns: 1fr; }
@@ -437,5 +507,8 @@ canvas { width: 100% !important; }
 }
 @media (max-width: 560px) {
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .ret-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .ret-params-grid  { grid-template-columns: repeat(2, 1fr); }
+  .ret-proj-grid    { grid-template-columns: 1fr 1fr; }
   .table th:nth-child(4), .table td:nth-child(4) { display: none; }
 }

@@ -35,6 +35,7 @@
     <button class="tab-btn" data-tab="korean" data-i18n="tab_korean">🌸 Korean</button>
     <button class="tab-btn" data-tab="crypto" data-i18n="tab_crypto">₿ Crypto</button>
     <button class="tab-btn" data-tab="krw" data-i18n="tab_krw">🐷 KRW</button>
+    <button class="tab-btn" data-tab="retirement" data-i18n="tab_retirement">🌾 Retirement</button>
   </nav>
 
   <!-- ── TOTAL TAB ── -->
@@ -72,7 +73,6 @@
     </div>
 
     <div class="charts-row">
-      <!-- Pie / Donut chart -->
       <div class="card pie-card">
         <h2 data-i18n="chart_alloc">Harvest Allocation</h2>
         <div class="pie-wrap">
@@ -81,7 +81,6 @@
         <div id="pie-legend" class="pie-legend"></div>
       </div>
 
-      <!-- Multi-line history chart -->
       <div class="card line-card">
         <div class="card-header">
           <h2 data-i18n="chart_growth">Growth Over Time 🌳</h2>
@@ -268,6 +267,162 @@
         <button id="krw-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
+  </div>
+
+  <!-- ── RETIREMENT TAB ── -->
+  <div id="tab-retirement" class="tab-panel hidden">
+
+    <!-- 4-col summary -->
+    <div class="ret-summary-grid">
+      <div class="scard scard-ret-kw">
+        <div class="scard-label" data-i18n="ret_card_kyowon">교원공제회</div>
+        <div id="ret-kw-val" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-ret-sk">
+        <div class="scard-label" data-i18n="ret_card_pension">사학연금 / 월</div>
+        <div id="ret-sk-val" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-ret-time">
+        <div class="scard-label" data-i18n="ret_card_time">퇴직까지</div>
+        <div id="ret-time-val" class="scard-value">—</div>
+      </div>
+      <div class="scard scard-ret-total">
+        <div class="scard-label" data-i18n="ret_card_total">총 노후자산</div>
+        <div id="ret-total-val" class="scard-value">—</div>
+      </div>
+    </div>
+
+    <!-- 교원공제회 card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 data-i18n="h2_kyowon">교원공제회 장기저축급여</h2>
+        <div class="header-actions">
+          <button id="ret-kyowon-lock-btn" class="btn-edit-lock" title="Edit">🔒</button>
+        </div>
+      </div>
+
+      <div class="ret-params-grid">
+        <div><div class="ret-plabel" data-i18n="ret_monthly">월 납입액</div><div id="kw-monthly" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_start">가입월</div><div id="kw-start" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_duration">납입기간</div><div id="kw-duration" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_rate">이율</div><div id="kw-rate" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_total_paid">총 납입액</div><div id="kw-total-paid" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_end_date">만기</div><div id="kw-end-date" class="ret-pval">—</div></div>
+      </div>
+
+      <div class="ret-progress-section">
+        <div class="ret-progress-meta">
+          <span id="kw-prog-label" class="ret-prog-status">납입 현황</span>
+          <span id="kw-prog-pct" class="ret-prog-pct">—</span>
+        </div>
+        <div class="ret-track"><div id="kw-bar" class="ret-bar ret-bar-green"></div></div>
+      </div>
+
+      <div class="ret-result-row">
+        <span class="ret-result-label" data-i18n="ret_lumpsum">예상 일시금</span>
+        <span id="kw-lumpsum" class="ret-result-val">—</span>
+      </div>
+
+      <div id="ret-kyowon-form" class="add-form hidden" style="flex-wrap:wrap; gap:0.4rem 0.6rem;">
+        <input id="kw-inp-monthly" type="number" placeholder="1500000" style="width:130px" />
+        <label class="form-lbl" data-i18n="ret_start">가입</label>
+        <input id="kw-inp-sy" type="number" placeholder="2014" style="width:68px" />
+        <span class="form-sep">/</span>
+        <input id="kw-inp-sm" type="number" placeholder="4" min="1" max="12" style="width:48px" />
+        <label class="form-lbl" data-i18n="ret_duration">기간</label>
+        <input id="kw-inp-dy" type="number" placeholder="12" style="width:52px" />
+        <span class="form-sep" data-i18n="lbl_yr">년</span>
+        <input id="kw-inp-dm" type="number" placeholder="2" min="0" max="11" style="width:48px" />
+        <span class="form-sep" data-i18n="lbl_mo">개월</span>
+        <label class="form-lbl" data-i18n="ret_rate">이율</label>
+        <input id="kw-inp-rate" type="number" placeholder="2.5" step="0.1" style="width:60px" />
+        <span class="form-sep">%</span>
+        <button id="kw-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="kw-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
+      </div>
+
+      <div class="ret-note" data-i18n="ret_note_kyowon">※ 이율은 추정치입니다. 정확한 수령액은 교원공제회에 문의하세요.</div>
+    </div>
+
+    <!-- 사학연금 card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 data-i18n="h2_sakhak">사학연금</h2>
+        <div class="header-actions">
+          <button id="ret-sakhak-lock-btn" class="btn-edit-lock" title="Edit">🔒</button>
+        </div>
+      </div>
+
+      <div class="ret-params-grid">
+        <div><div class="ret-plabel" data-i18n="ret_salary">현재 연봉</div><div id="sk-salary" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_growth">연봉 상승률</div><div id="sk-growth" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_service">재직기간</div><div id="sk-service" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_accrual">연금 배율</div><div id="sk-accrual" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_birth">생년월일</div><div id="sk-birth" class="ret-pval">—</div></div>
+        <div><div class="ret-plabel" data-i18n="ret_ret_age">퇴직 나이</div><div id="sk-ret-age" class="ret-pval">—</div></div>
+      </div>
+
+      <div class="ret-progress-section">
+        <div class="ret-progress-meta">
+          <span id="sk-prog-label" class="ret-prog-status" data-i18n="ret_service_progress">재직 현황</span>
+          <span id="sk-prog-pct" class="ret-prog-pct">—</span>
+        </div>
+        <div class="ret-track"><div id="sk-bar" class="ret-bar ret-bar-coral"></div></div>
+      </div>
+
+      <div class="ret-proj-grid">
+        <div class="ret-proj-cell">
+          <div class="ret-plabel" data-i18n="ret_final_salary">퇴직시 연봉</div>
+          <div id="sk-final-salary" class="ret-pval">—</div>
+        </div>
+        <div class="ret-proj-cell">
+          <div class="ret-plabel" data-i18n="ret_avg_salary">재직 평균 연봉</div>
+          <div id="sk-avg-salary" class="ret-pval">—</div>
+        </div>
+        <div class="ret-proj-cell ret-proj-highlight">
+          <div class="ret-plabel" data-i18n="ret_monthly_pension">예상 월 수령</div>
+          <div id="sk-monthly-pension" class="ret-result-val">—</div>
+        </div>
+        <div class="ret-proj-cell">
+          <div class="ret-plabel" data-i18n="ret_annual_pension">연간 수령</div>
+          <div id="sk-annual-pension" class="ret-pval">—</div>
+        </div>
+        <div class="ret-proj-cell">
+          <div class="ret-plabel" data-i18n="ret_lifetime_pension">20년 총 수령</div>
+          <div id="sk-lifetime" class="ret-pval">—</div>
+        </div>
+        <div class="ret-proj-cell">
+          <div class="ret-plabel" data-i18n="ret_ret_date">예상 퇴직일</div>
+          <div id="sk-ret-date" class="ret-pval">—</div>
+        </div>
+      </div>
+
+      <div id="ret-sakhak-form" class="add-form hidden" style="flex-wrap:wrap; gap:0.4rem 0.6rem;">
+        <label class="form-lbl" data-i18n="ret_salary">연봉</label>
+        <input id="sk-inp-salary" type="number" placeholder="250000000" style="width:140px" />
+        <label class="form-lbl" data-i18n="ret_growth">상승률</label>
+        <input id="sk-inp-growth" type="number" placeholder="4.5" step="0.1" style="width:60px" />
+        <span class="form-sep">%</span>
+        <label class="form-lbl" data-i18n="ret_start">가입년도</label>
+        <input id="sk-inp-sy" type="number" placeholder="2014" style="width:68px" />
+        <span class="form-sep">/</span>
+        <input id="sk-inp-sm" type="number" placeholder="4" min="1" max="12" style="width:48px" />
+        <label class="form-lbl" data-i18n="ret_accrual">배율</label>
+        <input id="sk-inp-accrual" type="number" placeholder="1.7" step="0.1" style="width:60px" />
+        <span class="form-sep">%</span>
+        <label class="form-lbl" data-i18n="ret_birth">생년</label>
+        <input id="sk-inp-by" type="number" placeholder="1978" style="width:68px" />
+        <span class="form-sep">/</span>
+        <input id="sk-inp-bm" type="number" placeholder="12" min="1" max="12" style="width:48px" />
+        <label class="form-lbl" data-i18n="ret_ret_age">퇴직 나이</label>
+        <input id="sk-inp-ret-age" type="number" placeholder="65" style="width:56px" />
+        <button id="sk-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="sk-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
+      </div>
+
+      <div class="ret-note" data-i18n="ret_note_sakhak">※ 연금액 = 평균기준소득월액 × 재직연수 × 1.7%. 소득상한 및 개혁 내용에 따라 실제 금액은 상이할 수 있습니다.</div>
+    </div>
+
   </div>
 
   <footer class="app-footer">
