@@ -318,25 +318,70 @@
         <div class="ret-track"><div id="kw-bar" class="ret-bar ret-bar-green"></div></div>
       </div>
 
+      <!-- Official breakdown from 교원공제회 -->
+      <div id="kw-breakdown" class="ret-breakdown">
+        <div class="ret-brow">
+          <span class="ret-blabel">부담금 (원금)</span>
+          <span id="kw-principal" class="ret-bval">—</span>
+        </div>
+        <div class="ret-brow">
+          <span class="ret-blabel">부가금 (이자)</span>
+          <span id="kw-interest" class="ret-bval ret-bval-pos">—</span>
+        </div>
+        <div class="ret-brow ret-brow-tax">
+          <span class="ret-blabel">소득세</span>
+          <span id="kw-income-tax" class="ret-bval ret-bval-neg">—</span>
+        </div>
+        <div class="ret-brow ret-brow-tax">
+          <span class="ret-blabel">주민세</span>
+          <span id="kw-local-tax" class="ret-bval ret-bval-neg">—</span>
+        </div>
+        <div class="ret-brow ret-brow-total">
+          <span class="ret-blabel" data-i18n="ret_net_payout">세후 수령액</span>
+          <span id="kw-net" class="ret-bval ret-bval-net">—</span>
+        </div>
+        <div class="ret-brow-meta">
+          <span id="kw-as-of" class="ret-blabel-small"></span>
+          <span id="kw-projected" class="ret-blabel-small"></span>
+        </div>
+      </div>
+
       <div class="ret-result-row">
-        <span class="ret-result-label" data-i18n="ret_lumpsum">예상 일시금</span>
+        <span class="ret-result-label" data-i18n="ret_lumpsum">세후 지급예정액</span>
         <span id="kw-lumpsum" class="ret-result-val">—</span>
       </div>
 
       <div id="ret-kyowon-form" class="add-form hidden" style="flex-wrap:wrap; gap:0.4rem 0.6rem;">
-        <input id="kw-inp-monthly" type="number" placeholder="1500000" style="width:130px" />
+        <label class="form-lbl" data-i18n="ret_monthly">월 납입액</label>
+        <input id="kw-inp-monthly" type="number" placeholder="1500000" style="width:120px" />
         <label class="form-lbl" data-i18n="ret_start">가입</label>
         <input id="kw-inp-sy" type="number" placeholder="2014" style="width:68px" />
         <span class="form-sep">/</span>
         <input id="kw-inp-sm" type="number" placeholder="4" min="1" max="12" style="width:48px" />
         <label class="form-lbl" data-i18n="ret_duration">기간</label>
-        <input id="kw-inp-dy" type="number" placeholder="12" style="width:52px" />
+        <input id="kw-inp-dy" type="number" placeholder="30" style="width:52px" />
         <span class="form-sep" data-i18n="lbl_yr">년</span>
-        <input id="kw-inp-dm" type="number" placeholder="2" min="0" max="11" style="width:48px" />
+        <input id="kw-inp-dm" type="number" placeholder="0" min="0" max="11" style="width:48px" />
         <span class="form-sep" data-i18n="lbl_mo">개월</span>
         <label class="form-lbl" data-i18n="ret_rate">이율</label>
         <input id="kw-inp-rate" type="number" placeholder="2.5" step="0.1" style="width:60px" />
         <span class="form-sep">%</span>
+        <hr style="width:100%;border-color:var(--border-sub);margin:0.3rem 0" />
+        <label class="form-lbl" style="color:var(--gold)">교원공제회 공식 수령액</label>
+        <label class="form-lbl">세후 수령액</label>
+        <input id="kw-inp-offnet" type="number" placeholder="805169550" style="width:130px" />
+        <label class="form-lbl">부담금(원금)</label>
+        <input id="kw-inp-offprin" type="number" placeholder="438780000" style="width:130px" />
+        <label class="form-lbl">부가금(이자)</label>
+        <input id="kw-inp-offint" type="number" placeholder="379847510" style="width:130px" />
+        <label class="form-lbl">소득세</label>
+        <input id="kw-inp-offitax" type="number" placeholder="12234510" style="width:110px" />
+        <label class="form-lbl">주민세</label>
+        <input id="kw-inp-offltax" type="number" placeholder="1223450" style="width:100px" />
+        <label class="form-lbl">조회 기준일</label>
+        <input id="kw-inp-offasof" type="text" placeholder="2026-06-19" style="width:100px" />
+        <label class="form-lbl">추정 기준일</label>
+        <input id="kw-inp-offproj" type="text" placeholder="2044-03-01" style="width:100px" />
         <button id="kw-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
         <button id="kw-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
@@ -416,6 +461,10 @@
         <input id="sk-inp-bm" type="number" placeholder="12" min="1" max="12" style="width:48px" />
         <label class="form-lbl" data-i18n="ret_ret_age">퇴직 나이</label>
         <input id="sk-inp-ret-age" type="number" placeholder="65" style="width:56px" />
+        <label class="form-lbl">퇴직 년/월</label>
+        <input id="sk-inp-ret-year" type="number" placeholder="2044" style="width:70px" />
+        <span class="form-sep">/</span>
+        <input id="sk-inp-ret-month" type="number" placeholder="3" min="1" max="12" style="width:48px" />
         <button id="sk-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
         <button id="sk-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>

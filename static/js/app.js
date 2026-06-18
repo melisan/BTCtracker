@@ -16,9 +16,21 @@ const KOSPI_TYPES = new Set(["005930.KS","000660.KS"]);
 const KOSPI_BADGE = { "005930.KS": "삼성전자", "000660.KS": "SK하이닉스" };
 
 const DEFAULT_RETIREMENT = {
-  kyowon: { monthly: 1500000, startYear: 2014, startMonth: 4, durationYears: 12, durationMonths: 2, rate: 2.5 },
-  sakhak: { currentSalary: 250000000, growthRate: 4.5, startYear: 2014, startMonth: 4, accrualRate: 1.7,
-            birthYear: 1978, birthMonth: 12, birthDay: 3, retirementAge: 65 },
+  kyowon: {
+    monthly: 1500000, startYear: 2014, startMonth: 4,
+    durationYears: 30, durationMonths: 0, rate: 2.5,
+    // Official 교원공제회 figures (조회 기준일 2026-06-19, 추정 기준일 2044-03-01)
+    officialNet: 805169550, officialPrincipal: 438780000,
+    officialInterest: 379847510, officialIncomeTax: 12234510,
+    officialLocalTax: 1223450, officialAsOf: "2026-06-19",
+    officialProjected: "2044-03-01",
+  },
+  sakhak: {
+    currentSalary: 250000000, growthRate: 4.5,
+    startYear: 2014, startMonth: 4, accrualRate: 1.7,
+    birthYear: 1978, birthMonth: 12, birthDay: 3,
+    retirementAge: 65, retirementYear: 2044, retirementMonth: 3,
+  },
 };
 
 // ── i18n ──────────────────────────────────────────────────────
@@ -73,7 +85,8 @@ const STRINGS = {
     ret_monthly_pension: "Monthly Pension",    ret_annual_pension: "Annual Pension",
     ret_lifetime_pension: "20yr Total",        ret_ret_date: "Est. Retirement",
     ret_service_progress: "Service Record",
-    ret_note_kyowon: "※ Rate is estimated. Contact 교원공제회 for the exact amount.",
+    ret_net_payout: "Net Payout (after tax)",
+    ret_note_kyowon: "※ Official figures from 교원공제회 (2026-06-19). Update annually.",
     ret_note_sakhak: "※ Pension = career avg monthly income × service years × 1.7%. Subject to income caps and pension reform.",
     lbl_yr: "yr",  lbl_mo: "mo",
   },
@@ -125,7 +138,8 @@ const STRINGS = {
     ret_monthly_pension: "예상 월 수령", ret_annual_pension: "연간 수령",
     ret_lifetime_pension: "20년 총 수령", ret_ret_date: "예상 퇴직일",
     ret_service_progress: "재직 현황",
-    ret_note_kyowon: "※ 이율은 추정치입니다. 정확한 수령액은 교원공제회에 문의하세요.",
+    ret_net_payout: "세후 수령액",
+    ret_note_kyowon: "※ 교원공제회 공식 조회 결과 (2026-06-19 기준). 매년 업데이트 권장.",
     ret_note_sakhak: "※ 연금액 = 평균기준소득월액 × 재직연수 × 1.7%. 소득상한 및 개혁 내용에 따라 실제 금액 상이.",
     lbl_yr: "년",  lbl_mo: "개월",
   },
@@ -168,7 +182,16 @@ let retirementParams = null;
 function loadRetirementParams() {
   try {
     const stored = localStorage.getItem("retirementParams");
-    retirementParams = stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(DEFAULT_RETIREMENT));
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const defK = DEFAULT_RETIREMENT.kyowon, defS = DEFAULT_RETIREMENT.sakhak;
+      retirementParams = {
+        kyowon: { ...defK, ...parsed.kyowon },
+        sakhak: { ...defS, ...parsed.sakhak },
+      };
+    } else {
+      retirementParams = JSON.parse(JSON.stringify(DEFAULT_RETIREMENT));
+    }
   } catch { retirementParams = JSON.parse(JSON.stringify(DEFAULT_RETIREMENT)); }
 }
 function saveRetirementParams() {
@@ -675,8 +698,8 @@ function calcRetirement() {
   const ageMs        = now - birthDate;
   const ageDecimal   = ageMs / (365.25 * 24 * 3600 * 1000);
   const currentAge   = Math.floor(ageDecimal);
-  const retYear      = sakhak.birthYear + sakhak.retirementAge;
-  const retMonth     = sakhak.birthMonth;
+  const retYear      = sakhak.retirementYear  || (sakhak.birthYear + sakhak.retirementAge);
+  const retMonth     = sakhak.retirementMonth || sakhak.birthMonth;
   const retFrac      = retYear + (retMonth - 1) / 12;
   const curFrac      = curYear + (curMonth - 1) / 12;
   const yearsToRet   = retFrac - curFrac;
@@ -741,8 +764,11 @@ function renderRetirementTab() {
   const { kw, sk, personal } = c;
   const p = retirementParams;
 
+  // Use official 교원공제회 net if set
+  const kwDisplay = (p.kyowon.officialNet > 0) ? p.kyowon.officialNet : kw.lumpSum;
+
   // Summary cards
-  setText("ret-kw-val",   fmtKRW.format(kw.lumpSum));
+  setText("ret-kw-val",   fmtKRW.format(kwDisplay));
   setText("ret-sk-val",   fmtKRW.format(sk.monthlyPension));
   setText("ret-time-val", personal.ytrY > 0
     ? `${personal.ytrY}${S.lbl_yr} ${personal.ytrM}${S.lbl_mo}`
@@ -765,24 +791,46 @@ function renderRetirementTab() {
     ? (lang === "ko" ? "납입 완료 ✓" : "Complete ✓")
     : (lang === "ko" ? `납입 중 (${kw.monthsPaid}/${kw.totalMonths}개월)` : `Paying (${kw.monthsPaid}/${kw.totalMonths}mo)`));
 
-  setText("kw-lumpsum", fmtKRW.format(kw.lumpSum));
+  // 교원공제회 official breakdown
+  const hasOfficial = p.kyowon.officialNet > 0;
+  const bkSection = document.getElementById("kw-breakdown");
+  if (bkSection) bkSection.classList.toggle("hidden", !hasOfficial);
+  if (hasOfficial) {
+    setText("kw-principal",  fmtKRW.format(p.kyowon.officialPrincipal));
+    setText("kw-interest",   fmtKRW.format(p.kyowon.officialInterest));
+    setText("kw-income-tax", `▼ ${fmtKRW.format(p.kyowon.officialIncomeTax)}`);
+    setText("kw-local-tax",  `▼ ${fmtKRW.format(p.kyowon.officialLocalTax)}`);
+    setText("kw-net",        fmtKRW.format(p.kyowon.officialNet));
+    setText("kw-as-of",      `조회: ${p.kyowon.officialAsOf}`);
+    setText("kw-projected",  `퇴직 기준: ${p.kyowon.officialProjected}`);
+  }
+  setText("kw-lumpsum", fmtKRW.format(kwDisplay));
 
   // Populate edit form when visible
   if (editMode) {
-    setVal("kw-inp-monthly", p.kyowon.monthly);
-    setVal("kw-inp-sy",      p.kyowon.startYear);
-    setVal("kw-inp-sm",      p.kyowon.startMonth);
-    setVal("kw-inp-dy",      p.kyowon.durationYears);
-    setVal("kw-inp-dm",      p.kyowon.durationMonths);
-    setVal("kw-inp-rate",    p.kyowon.rate);
-    setVal("sk-inp-salary",  p.sakhak.currentSalary);
-    setVal("sk-inp-growth",  p.sakhak.growthRate);
-    setVal("sk-inp-sy",      p.sakhak.startYear);
-    setVal("sk-inp-sm",      p.sakhak.startMonth);
-    setVal("sk-inp-accrual", p.sakhak.accrualRate);
-    setVal("sk-inp-by",      p.sakhak.birthYear);
-    setVal("sk-inp-bm",      p.sakhak.birthMonth);
-    setVal("sk-inp-ret-age", p.sakhak.retirementAge);
+    setVal("kw-inp-monthly",   p.kyowon.monthly);
+    setVal("kw-inp-sy",        p.kyowon.startYear);
+    setVal("kw-inp-sm",        p.kyowon.startMonth);
+    setVal("kw-inp-dy",        p.kyowon.durationYears);
+    setVal("kw-inp-dm",        p.kyowon.durationMonths);
+    setVal("kw-inp-rate",      p.kyowon.rate);
+    setVal("kw-inp-offnet",    p.kyowon.officialNet);
+    setVal("kw-inp-offprin",   p.kyowon.officialPrincipal);
+    setVal("kw-inp-offint",    p.kyowon.officialInterest);
+    setVal("kw-inp-offitax",   p.kyowon.officialIncomeTax);
+    setVal("kw-inp-offltax",   p.kyowon.officialLocalTax);
+    setVal("kw-inp-offasof",   p.kyowon.officialAsOf);
+    setVal("kw-inp-offproj",   p.kyowon.officialProjected);
+    setVal("sk-inp-salary",    p.sakhak.currentSalary);
+    setVal("sk-inp-growth",    p.sakhak.growthRate);
+    setVal("sk-inp-sy",        p.sakhak.startYear);
+    setVal("sk-inp-sm",        p.sakhak.startMonth);
+    setVal("sk-inp-accrual",   p.sakhak.accrualRate);
+    setVal("sk-inp-by",        p.sakhak.birthYear);
+    setVal("sk-inp-bm",        p.sakhak.birthMonth);
+    setVal("sk-inp-ret-age",   p.sakhak.retirementAge);
+    setVal("sk-inp-ret-year",  p.sakhak.retirementYear);
+    setVal("sk-inp-ret-month", p.sakhak.retirementMonth);
   }
 
   // 사학연금 params display
@@ -811,7 +859,7 @@ function renderRetirementTab() {
 
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 function setWidth(id, pct) { const el = document.getElementById(id); if (el) el.style.width = `${Math.min(100, pct)}%`; }
-function setVal(id, val) { const el = document.getElementById(id); if (el && el.value === "") el.value = val; }
+function setVal(id, val) { const el = document.getElementById(id); if (el) el.value = val ?? ""; }
 
 // ── Inline edit ───────────────────────────────────────────────
 function startEdit(e) {
@@ -868,12 +916,20 @@ document.getElementById("kw-cancel-btn")?.addEventListener("click", () => {
 document.getElementById("kw-save-btn")?.addEventListener("click", () => {
   const num = id => parseFloat(document.getElementById(id)?.value) || 0;
   const int = id => parseInt(document.getElementById(id)?.value)   || 0;
-  retirementParams.kyowon.monthly        = num("kw-inp-monthly");
-  retirementParams.kyowon.startYear      = int("kw-inp-sy");
-  retirementParams.kyowon.startMonth     = int("kw-inp-sm");
-  retirementParams.kyowon.durationYears  = int("kw-inp-dy");
-  retirementParams.kyowon.durationMonths = int("kw-inp-dm");
-  retirementParams.kyowon.rate           = num("kw-inp-rate");
+  const str = id => document.getElementById(id)?.value?.trim()     || "";
+  retirementParams.kyowon.monthly             = num("kw-inp-monthly");
+  retirementParams.kyowon.startYear           = int("kw-inp-sy");
+  retirementParams.kyowon.startMonth          = int("kw-inp-sm");
+  retirementParams.kyowon.durationYears       = int("kw-inp-dy");
+  retirementParams.kyowon.durationMonths      = int("kw-inp-dm");
+  retirementParams.kyowon.rate                = num("kw-inp-rate");
+  retirementParams.kyowon.officialNet         = num("kw-inp-offnet");
+  retirementParams.kyowon.officialPrincipal   = num("kw-inp-offprin");
+  retirementParams.kyowon.officialInterest    = num("kw-inp-offint");
+  retirementParams.kyowon.officialIncomeTax   = num("kw-inp-offitax");
+  retirementParams.kyowon.officialLocalTax    = num("kw-inp-offltax");
+  retirementParams.kyowon.officialAsOf        = str("kw-inp-offasof");
+  retirementParams.kyowon.officialProjected   = str("kw-inp-offproj");
   saveRetirementParams();
   editMode = false; renderActiveTab();
 });
@@ -892,7 +948,9 @@ document.getElementById("sk-save-btn")?.addEventListener("click", () => {
   retirementParams.sakhak.accrualRate    = num("sk-inp-accrual");
   retirementParams.sakhak.birthYear      = int("sk-inp-by");
   retirementParams.sakhak.birthMonth     = int("sk-inp-bm");
-  retirementParams.sakhak.retirementAge  = int("sk-inp-ret-age");
+  retirementParams.sakhak.retirementAge   = int("sk-inp-ret-age");
+  retirementParams.sakhak.retirementYear  = int("sk-inp-ret-year");
+  retirementParams.sakhak.retirementMonth = int("sk-inp-ret-month");
   saveRetirementParams();
   editMode = false; renderActiveTab();
 });

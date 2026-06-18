@@ -463,6 +463,33 @@ canvas { width: 100% !important; }
 .ret-proj-highlight .ret-result-val { font-size: 1.3rem; }
 .ret-proj-highlight .ret-plabel { color: var(--gold); }
 
+/* Official payout breakdown */
+.ret-breakdown {
+  border: 1px solid var(--border-sub); border-radius: 9px;
+  overflow: hidden; margin: 0.75rem 0;
+}
+.ret-brow {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.48rem 1rem; border-bottom: 1px solid var(--border-sub);
+  font-size: 0.82rem;
+}
+.ret-brow-tax { opacity: 0.85; }
+.ret-brow-total {
+  background: linear-gradient(90deg, rgba(232,184,75,0.08), transparent);
+  border-bottom: none;
+}
+.ret-brow-meta {
+  display: flex; justify-content: space-between;
+  padding: 0.28rem 1rem; border-top: 1px solid var(--border-sub);
+  background: var(--bg-inner);
+}
+.ret-blabel      { color: var(--text-muted); font-size: 0.8rem; }
+.ret-blabel-small { font-size: 0.63rem; color: #5a5040; }
+.ret-bval        { font-weight: 600; color: var(--text); font-size: 0.85rem; }
+.ret-bval-pos    { color: var(--green); }
+.ret-bval-neg    { color: var(--coral); font-size: 0.8rem; }
+.ret-bval-net    { color: var(--gold); font-size: 1.05rem; font-weight: 700; }
+
 .ret-note {
   font-size: 0.67rem; color: #5a5040; line-height: 1.55;
   margin-top: 0.85rem; padding-top: 0.75rem;
