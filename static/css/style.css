@@ -211,6 +211,10 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 .crypto-chart-wrap { position: relative; height: 220px; }
 .crypto-chart-wrap canvas { height: 100% !important; }
 
+/* ── Korean stocks history chart ── */
+.korean-chart-wrap { position: relative; height: 220px; }
+.korean-chart-wrap canvas { height: 100% !important; }
+
 /* ── Price strip ── */
 .price-strip {
   display: flex; align-items: center; gap: 1rem;

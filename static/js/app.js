@@ -60,6 +60,8 @@ const STRINGS = {
     empty_krw: "No KRW holdings yet.",
     empty_us_chart: "Add US stock holdings to see price charts.",
     empty_crypto_chart: "Add crypto holdings to see price chart.",
+    empty_korean_chart: "Add Korean stock holdings to see price chart.",
+    chart_korean_perf: "30-Day Korean Stock Performance 🌸",
     ph_us_label: "Label (e.g. Fidelity AAPL)",   ph_us_amount: "Shares",
     ph_korean_label: "Label (e.g. 삼성전자)",       ph_korean_amount: "Shares",
     ph_crypto_label: "Label (e.g. Upbit BTC)",    ph_crypto_amount: "Amount",
@@ -113,6 +115,8 @@ const STRINGS = {
     empty_krw: "원화 보유가 없습니다.",
     empty_us_chart: "미국 주식을 추가하면 가격 차트가 표시됩니다.",
     empty_crypto_chart: "암호화폐를 추가하면 가격 차트가 표시됩니다.",
+    empty_korean_chart: "한국 주식을 추가하면 가격 차트가 표시됩니다.",
+    chart_korean_perf: "30일 한국 주식 추이 🌸",
     ph_us_label: "라벨 (예: 피델리티 AAPL)",     ph_us_amount: "주수",
     ph_korean_label: "라벨 (예: 삼성전자)",        ph_korean_amount: "주수",
     ph_crypto_label: "라벨 (예: 업비트 BTC)",     ph_crypto_amount: "수량",
@@ -167,7 +171,8 @@ let holdings        = [];
 let pieChart        = null;
 let totalChart      = null;
 let usStocksChart   = null;
-let cryptoHistChart = null;
+let cryptoHistChart   = null;
+let koreanStocksChart = null;
 let activeTab       = "total";
 let activeRange     = "daily";
 let normalizeMode   = false;
@@ -488,6 +493,7 @@ async function fetchUSHistory() {
     usHistoryData = await res.json();
     renderUSStocksChart();
     renderCryptoHistChart();
+    renderKoreanStocksChart();
   } catch (err) { console.error("US history fetch failed:", err); }
 }
 
@@ -572,6 +578,55 @@ function renderCryptoHistChart() {
   });
 }
 
+// ── Korean Stocks History Chart ───────────────────────────────
+const KOSPI_COLORS = { "005930.KS": "#ff6b6b", "000660.KS": "#79c0ff" };
+
+function renderKoreanStocksChart() {
+  const canvas = document.getElementById("korean-stocks-chart");
+  const empty  = document.getElementById("korean-chart-empty");
+  if (!canvas) return;
+  const S = STRINGS[lang];
+  const tickers = [...new Set(holdings.filter(h => KOSPI_TYPES.has(h.asset_type)).map(h => h.asset_type))];
+  if (!tickers.length || !Object.keys(usHistoryData).length) {
+    canvas.classList.add("hidden"); empty.classList.remove("hidden"); empty.textContent = S.empty_korean_chart; return;
+  }
+  const allDates = [...new Set(tickers.flatMap(t => Object.keys(usHistoryData[t] || {})))].sort();
+  if (!allDates.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
+  canvas.classList.remove("hidden"); empty.classList.add("hidden");
+
+  const datasets = tickers.map(t => {
+    const prices = usHistoryData[t] || {};
+    const vals   = allDates.map(d => prices[d] ?? null);
+    const first  = vals.find(v => v != null) || 1;
+    return { label: KOSPI_BADGE[t] || t,
+      data: vals.map(v => v != null ? parseFloat((v / first * 100).toFixed(2)) : null),
+      borderColor: KOSPI_COLORS[t] || "#888", backgroundColor: "transparent", borderWidth: 1.5,
+      pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3, spanGaps: false };
+  });
+
+  if (koreanStocksChart) {
+    koreanStocksChart.data.labels = allDates;
+    koreanStocksChart.data.datasets = datasets;
+    koreanStocksChart.update("none");
+    return;
+  }
+  koreanStocksChart = new Chart(canvas.getContext("2d"), {
+    type: "line", data: { labels: allDates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: "#8b949e", font: { size: 11 }, boxWidth: 12, padding: 10 }},
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) + "%" : "—"}` }},
+      },
+      scales: {
+        x: { ticks: { color: "#6e7681", maxRotation: 0, maxTicksLimit: 8 }, grid: { color: "#21262d" }},
+        y: { ticks: { color: "#6e7681", callback: v => v.toFixed(0) + "%" }, grid: { color: "#21262d" }},
+      },
+    },
+  });
+}
+
 // ── Edit-mode helpers ─────────────────────────────────────────
 function setLockBtn(id) {
   const btn = document.getElementById(id);
@@ -619,6 +674,7 @@ function renderKoreanTab() {
   const S = STRINGS[lang];
   setLockBtn("korean-lock-btn");
   document.getElementById("korean-add-btn")?.classList.toggle("hidden", !editMode);
+  if (!Object.keys(usHistoryData).length) fetchUSHistory(); else renderKoreanStocksChart();
 
   const kH    = holdings.filter(h => KOSPI_TYPES.has(h.asset_type));
   let total   = 0;
