@@ -3,6 +3,7 @@ import requests
 import psycopg2
 import psycopg2.extras
 import os
+import re
 import time
 import logging
 from datetime import datetime, timedelta
@@ -16,25 +17,28 @@ DATABASE_URL    = os.environ.get("DATABASE_URL", "")
 ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "admin1234")
 COINGECKO_BASE  = "https://api.coingecko.com/api/v3"
 
-STOCKS = {
-    "AAPL":  "Apple",
-    "AMZN":  "Amazon",
-    "CVX":   "Chevron",
-    "LLY":   "Eli Lilly",
-    "GOOGL": "Alphabet A",
-    "GOOG":  "Alphabet C",
-    "NVO":   "Novo Nordisk",
-    "OXY":   "Occidental",
-    "MSTR":  "MicroStrategy",
-    "NVDA":  "NVIDIA",
-}
+# Ticker format: letters, digits, dots, dashes — max 20 chars
+TICKER_RE = re.compile(r'^[A-Za-z0-9.\-]{1,20}$')
+CRYPTO_KRW = {"BTC", "ETH", "KRW"}
 
-KOSPI = {
-    "005930.KS": "Samsung Electronics",
-    "000660.KS": "SK Hynix",
-}
+def is_korean(t):
+    return bool(re.search(r'\.(KS|KQ)$', t, re.IGNORECASE))
 
-VALID_TYPES = {"BTC", "ETH", "KRW"} | set(STOCKS.keys()) | set(KOSPI.keys())
+def is_us_stock(t):
+    return t not in CRYPTO_KRW and not is_korean(t)
+
+def get_held_stock_tickers():
+    """Return (us_tickers, korean_tickers) from distinct holdings in DB."""
+    try:
+        conn = get_db()
+        cur  = query(conn, "SELECT DISTINCT asset_type FROM holdings")
+        all_types = [r["asset_type"] for r in cur.fetchall()]
+        conn.close()
+    except Exception:
+        all_types = []
+    us  = sorted({t for t in all_types if is_us_stock(t)})
+    kor = sorted({t for t in all_types if is_korean(t)})
+    return us, kor
 
 _price_cache        = {"data": None, "date": None}
 _stock_cache        = {"data": None, "ts": 0}
@@ -143,20 +147,22 @@ def fetch_stock_prices():
     if _stock_cache["data"] and now - _stock_cache["ts"] < STOCK_TTL:
         return _stock_cache["data"]
 
-    all_tickers = list(STOCKS.keys()) + list(KOSPI.keys())
+    us_tickers, kor_tickers = get_held_stock_tickers()
+    all_tickers = us_tickers + kor_tickers
     raw = {}
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {ex.submit(_fetch_one_stock, t): t for t in all_tickers}
-        for future in as_completed(futures, timeout=20):
-            try:
-                ticker, price = future.result()
-                raw[ticker] = price
-            except Exception:
-                raw[futures[future]] = None
+    if all_tickers:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = {ex.submit(_fetch_one_stock, t): t for t in all_tickers}
+            for future in as_completed(futures, timeout=20):
+                try:
+                    ticker, price = future.result()
+                    raw[ticker] = price
+                except Exception:
+                    raw[futures[future]] = None
 
     result = {
-        "prices":       {t: raw.get(t) for t in STOCKS},
-        "kospi_prices": {t: raw.get(t) for t in KOSPI},
+        "prices":       {t: raw.get(t) for t in us_tickers},
+        "kospi_prices": {t: raw.get(t) for t in kor_tickers},
         "updated_at":   datetime.utcnow().isoformat(),
     }
     _stock_cache["data"] = result
@@ -173,11 +179,11 @@ def calc_breakdown(holdings, crypto_prices, stock_data=None):
     bd  = {"btc": 0, "eth": 0, "us": 0, "korean": 0, "krw": 0}
     for h in holdings:
         t, amt = h["asset_type"], h["amount"]
-        if   t == "BTC": bd["btc"]    += amt * crypto_prices["btc"]
-        elif t == "ETH": bd["eth"]    += amt * crypto_prices["eth"]
-        elif t == "KRW": bd["krw"]    += amt
-        elif t in STOCKS: bd["us"]    += amt * (sp.get(t) or 0) * usd_krw
-        elif t in KOSPI:  bd["korean"] += amt * (kp.get(t) or 0)
+        if   t == "BTC":      bd["btc"]    += amt * crypto_prices["btc"]
+        elif t == "ETH":      bd["eth"]    += amt * crypto_prices["eth"]
+        elif t == "KRW":      bd["krw"]    += amt
+        elif is_korean(t):    bd["korean"] += amt * (kp.get(t) or 0)
+        else:                 bd["us"]     += amt * (sp.get(t) or 0) * usd_krw
     bd["total"] = sum(bd.values())
     return bd
 
@@ -281,11 +287,13 @@ def run_backfill():
             price_data[key] = {}
 
     # Use yfinance for BTC/ETH (avoids CoinGecko rate limits)
+    stock_tickers = sorted({h["asset_type"] for h in holdings_rows
+                            if h["asset_type"] not in CRYPTO_KRW})
     tasks = [
         ("btc_usd", fetch_stock_history_prices, "BTC-USD", 400),
         ("eth_usd", fetch_stock_history_prices, "ETH-USD", 400),
         ("usd_krw", fetch_usdkrw_history, 400),
-    ] + [(t, fetch_stock_history_prices, t, 400) for t in list(STOCKS.keys()) + list(KOSPI.keys())]
+    ] + [(t, fetch_stock_history_prices, t, 400) for t in stock_tickers]
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         futs = [ex.submit(do_fetch, *task) for task in tasks]
@@ -312,12 +320,12 @@ def run_backfill():
             if   t == "BTC": bd["btc"] += amt * btc_p
             elif t == "ETH": bd["eth"] += amt * eth_p
             elif t == "KRW": bd["krw"] += amt
-            elif t in STOCKS:
-                p = price_data.get(t, {}).get(date) or get_nearest_price(price_data.get(t, {}), date) or 0
-                bd["us"] += amt * p * usd_krw
-            elif t in KOSPI:
+            elif is_korean(t):
                 p = price_data.get(t, {}).get(date) or get_nearest_price(price_data.get(t, {}), date) or 0
                 bd["korean"] += amt * p
+            else:
+                p = price_data.get(t, {}).get(date) or get_nearest_price(price_data.get(t, {}), date) or 0
+                bd["us"] += amt * p * usd_krw
         bd["total"] = sum(bd.values())
 
         try:
@@ -377,7 +385,9 @@ def api_prices():
 def api_stocks():
     try:
         data = fetch_stock_prices()
-        return jsonify({**data, "meta": STOCKS, "kospi_meta": KOSPI})
+        return jsonify({**data,
+                        "meta":       {t: t for t in data["prices"]},
+                        "kospi_meta": {t: t for t in data["kospi_prices"]}})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -387,9 +397,11 @@ def api_stocks_history():
     now = time.time()
     if _stock_hist_cache["data"] and now - _stock_hist_cache["ts"] < STOCK_HIST_TTL:
         return jsonify(_stock_hist_cache["data"])
+    us_tickers, kor_tickers = get_held_stock_tickers()
     # app key → yfinance ticker (crypto needs -USD suffix)
-    yf_map = {**{t: t for t in STOCKS}, **{t: t for t in KOSPI},
-              "BTC": "BTC-USD", "ETH": "ETH-USD"}
+    yf_map = {t: t for t in us_tickers + kor_tickers}
+    yf_map["BTC"] = "BTC-USD"
+    yf_map["ETH"] = "ETH-USD"
     result = {}
     def fetch_one(app_key, yf_ticker):
         import yfinance as yf
@@ -421,17 +433,18 @@ def api_get_holdings():
 def api_add_holding():
     data       = request.get_json()
     label      = (data.get("label") or "").strip()
-    asset_type = (data.get("asset_type") or "").upper()
-    # KOSPI tickers have dots and numbers, keep original case for those
-    if asset_type not in VALID_TYPES:
-        asset_type = (data.get("asset_type") or "").strip()
+    asset_type = (data.get("asset_type") or "").strip().upper()
     try:
         amount = float(data.get("amount", 0))
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid amount"}), 400
 
-    if not label or asset_type not in VALID_TYPES or amount < 0:
+    if not label or not TICKER_RE.match(asset_type) or amount < 0:
         return jsonify({"error": "Invalid input"}), 400
+
+    # Invalidate price/history caches so new ticker gets fetched immediately
+    _stock_cache["ts"]      = 0
+    _stock_hist_cache["ts"] = 0
 
     conn = get_db()
     try:

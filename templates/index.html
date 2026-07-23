@@ -140,19 +140,8 @@
         <tbody id="us-tbody"><tr class="empty-row"><td colspan="5">No US stock holdings yet.</td></tr></tbody>
       </table>
       <div id="us-add-form" class="add-form hidden">
-        <input id="us-new-label" type="text" placeholder="Label (e.g. Fidelity AAPL)" data-i18n-placeholder="ph_us_label" />
-        <select id="us-new-type">
-          <option value="AAPL">AAPL — Apple</option>
-          <option value="AMZN">AMZN — Amazon</option>
-          <option value="CVX">CVX — Chevron</option>
-          <option value="LLY">LLY — Eli Lilly</option>
-          <option value="GOOGL">GOOGL — Alphabet A</option>
-          <option value="GOOG">GOOG — Alphabet C</option>
-          <option value="NVO">NVO — Novo Nordisk</option>
-          <option value="OXY">OXY — Occidental</option>
-          <option value="MSTR">MSTR — MicroStrategy</option>
-          <option value="NVDA">NVDA — NVIDIA</option>
-        </select>
+        <input id="us-new-label" type="text" placeholder="Label (e.g. Fidelity TSLA)" data-i18n-placeholder="ph_us_label" />
+        <input id="us-new-type" type="text" placeholder="Ticker (e.g. TSLA)" data-i18n-placeholder="ph_us_type" style="width:140px;text-transform:uppercase" />
         <input id="us-new-amount" type="number" placeholder="Shares" step="any" min="0" data-i18n-placeholder="ph_us_amount" />
         <button id="us-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
         <button id="us-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
@@ -191,10 +180,7 @@
       </table>
       <div id="korean-add-form" class="add-form hidden">
         <input id="korean-new-label" type="text" placeholder="Label (e.g. 삼성전자)" data-i18n-placeholder="ph_korean_label" />
-        <select id="korean-new-type">
-          <option value="005930.KS">005930.KS — Samsung Electronics</option>
-          <option value="000660.KS">000660.KS — SK Hynix</option>
-        </select>
+        <input id="korean-new-type" type="text" placeholder="Ticker (e.g. 005930.KS)" data-i18n-placeholder="ph_korean_type" style="width:155px" />
         <input id="korean-new-amount" type="number" placeholder="Shares" step="any" min="0" data-i18n-placeholder="ph_korean_amount" />
         <button id="korean-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
         <button id="korean-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>

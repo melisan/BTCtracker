@@ -11,9 +11,11 @@ function escHtml(s) {
 }
 
 // ── Constants ─────────────────────────────────────────────────
-const STOCK_TYPES = new Set(["AAPL","AMZN","CVX","LLY","GOOGL","GOOG","NVO","OXY","MSTR","NVDA"]);
-const KOSPI_TYPES = new Set(["005930.KS","000660.KS"]);
+const CRYPTO_KRW  = new Set(["BTC", "ETH", "KRW"]);
 const KOSPI_BADGE = { "005930.KS": "삼성전자", "000660.KS": "SK하이닉스" };
+
+function isKorean(t)  { return /\.(KS|KQ)$/i.test(t); }
+function isUSStock(t) { return !CRYPTO_KRW.has(t) && !isKorean(t); }
 
 const DEFAULT_RETIREMENT = {
   kyowon: {
@@ -62,8 +64,10 @@ const STRINGS = {
     empty_crypto_chart: "Add crypto holdings to see price chart.",
     empty_korean_chart: "Add Korean stock holdings to see price chart.",
     chart_korean_perf: "30-Day Korean Stock Performance 🌸",
-    ph_us_label: "Label (e.g. Fidelity AAPL)",   ph_us_amount: "Shares",
+    ph_us_label: "Label (e.g. Fidelity TSLA)",   ph_us_amount: "Shares",
+    ph_us_type: "Ticker (e.g. TSLA)",
     ph_korean_label: "Label (e.g. 삼성전자)",       ph_korean_amount: "Shares",
+    ph_korean_type: "Ticker (e.g. 005930.KS)",
     ph_crypto_label: "Label (e.g. Upbit BTC)",    ph_crypto_amount: "Amount",
     ph_krw_label: "Label (e.g. Kakao Bank)",      ph_krw_amount: "Amount (₩)",
     ph_auth_pw: "Enter admin password",
@@ -117,8 +121,10 @@ const STRINGS = {
     empty_crypto_chart: "암호화폐를 추가하면 가격 차트가 표시됩니다.",
     empty_korean_chart: "한국 주식을 추가하면 가격 차트가 표시됩니다.",
     chart_korean_perf: "30일 한국 주식 추이 🌸",
-    ph_us_label: "라벨 (예: 피델리티 AAPL)",     ph_us_amount: "주수",
+    ph_us_label: "라벨 (예: 피델리티 TSLA)",      ph_us_amount: "주수",
+    ph_us_type: "종목 코드 (예: TSLA)",
     ph_korean_label: "라벨 (예: 삼성전자)",        ph_korean_amount: "주수",
+    ph_korean_type: "종목 코드 (예: 005930.KS)",
     ph_crypto_label: "라벨 (예: 업비트 BTC)",     ph_crypto_amount: "수량",
     ph_krw_label: "라벨 (예: 카카오뱅크)",         ph_krw_amount: "금액 (₩)",
     ph_auth_pw: "관리자 비밀번호 입력",
@@ -212,8 +218,8 @@ function computeBreakdown() {
     if      (t === "BTC")         bd.btc    += amt * cryptoPrices.btc;
     else if (t === "ETH")         bd.eth    += amt * cryptoPrices.eth;
     else if (t === "KRW")         bd.krw    += amt;
-    else if (STOCK_TYPES.has(t))  bd.us     += amt * (stockData.prices?.[t] || 0) * usd_krw;
-    else if (KOSPI_TYPES.has(t))  bd.korean += amt * (stockData.kospi_prices?.[t] || 0);
+    else if (isUSStock(t))  bd.us     += amt * (stockData.prices?.[t] || 0) * usd_krw;
+    else if (isKorean(t))  bd.korean += amt * (stockData.kospi_prices?.[t] || 0);
   });
   bd.total = bd.btc + bd.eth + bd.us + bd.korean + bd.krw;
   return bd;
@@ -224,8 +230,8 @@ function calcKRW(h) {
   if (t === "BTC") return h.amount * cryptoPrices.btc;
   if (t === "ETH") return h.amount * cryptoPrices.eth;
   if (t === "KRW") return h.amount;
-  if (STOCK_TYPES.has(t)) return h.amount * (stockData.prices?.[t] || 0) * (cryptoPrices.usd_krw || 1350);
-  if (KOSPI_TYPES.has(t)) return h.amount * (stockData.kospi_prices?.[t] || 0);
+  if (isUSStock(t)) return h.amount * (stockData.prices?.[t] || 0) * (cryptoPrices.usd_krw || 1350);
+  if (isKorean(t)) return h.amount * (stockData.kospi_prices?.[t] || 0);
   return 0;
 }
 
@@ -502,7 +508,7 @@ function renderUSStocksChart() {
   const empty  = document.getElementById("us-chart-empty");
   if (!canvas) return;
   const S = STRINGS[lang];
-  const tickers = [...new Set(holdings.filter(h => STOCK_TYPES.has(h.asset_type)).map(h => h.asset_type))];
+  const tickers = [...new Set(holdings.filter(h => isUSStock(h.asset_type)).map(h => h.asset_type))];
   if (!tickers.length || !Object.keys(usHistoryData).length) {
     canvas.classList.add("hidden"); empty.classList.remove("hidden"); empty.textContent = S.empty_us_chart; return;
   }
@@ -586,7 +592,7 @@ function renderKoreanStocksChart() {
   const empty  = document.getElementById("korean-chart-empty");
   if (!canvas) return;
   const S = STRINGS[lang];
-  const tickers = [...new Set(holdings.filter(h => KOSPI_TYPES.has(h.asset_type)).map(h => h.asset_type))];
+  const tickers = [...new Set(holdings.filter(h => isKorean(h.asset_type)).map(h => h.asset_type))];
   if (!tickers.length || !Object.keys(usHistoryData).length) {
     canvas.classList.add("hidden"); empty.classList.remove("hidden"); empty.textContent = S.empty_korean_chart; return;
   }
@@ -652,7 +658,7 @@ function renderUSTab() {
   document.getElementById("us-add-btn")?.classList.toggle("hidden", !editMode);
   if (!Object.keys(usHistoryData).length) fetchUSHistory(); else renderUSStocksChart();
 
-  const usH   = holdings.filter(h => STOCK_TYPES.has(h.asset_type));
+  const usH   = holdings.filter(h => isUSStock(h.asset_type));
   let total   = 0;
   const tbody = document.getElementById("us-tbody");
   if (!usH.length) {
@@ -676,7 +682,7 @@ function renderKoreanTab() {
   document.getElementById("korean-add-btn")?.classList.toggle("hidden", !editMode);
   if (!Object.keys(usHistoryData).length) fetchUSHistory(); else renderKoreanStocksChart();
 
-  const kH    = holdings.filter(h => KOSPI_TYPES.has(h.asset_type));
+  const kH    = holdings.filter(h => isKorean(h.asset_type));
   let total   = 0;
   const tbody = document.getElementById("korean-tbody");
   if (!kH.length) {
@@ -1026,15 +1032,18 @@ function wireAddForm(prefix, fixedType) {
   });
   document.getElementById(`${prefix}-save-btn`)?.addEventListener("click", async () => {
     const label      = labelEl?.value.trim();
-    const asset_type = typeEl ? typeEl.value : fixedType;
+    const asset_type = typeEl ? typeEl.value.trim().toUpperCase() : fixedType;
     const amount     = parseFloat(amountEl?.value);
-    if (!label || isNaN(amount) || amount < 0) { alert("Enter a label and valid amount."); return; }
-    await fetch("/api/holdings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label, asset_type, amount }) });
+    if (!label || !asset_type || isNaN(amount) || amount < 0) { alert("Enter a label, ticker, and valid amount."); return; }
+    const res = await fetch("/api/holdings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label, asset_type, amount }) });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); alert(err.error || "Failed to add holding."); return; }
     form?.classList.add("hidden");
     if (labelEl)  labelEl.value  = "";
     if (amountEl) amountEl.value = "";
-    if (typeEl)   typeEl.selectedIndex = 0;
-    await Promise.all([fetchHoldings(), fetchHistory()]);
+    if (typeEl)   typeEl.value   = "";
+    // Reset history cache so new ticker gets fetched
+    usHistoryData = {};
+    await Promise.all([fetchHoldings(), fetchHistory(), fetchUSHistory()]);
   });
 }
 wireAddForm("us");
