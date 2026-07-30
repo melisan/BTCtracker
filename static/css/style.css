@@ -114,6 +114,13 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 .scard-krw    { border-color: rgba(76,175,125,0.3); }
 .scard-krw    .scard-value { color: var(--green); }
 
+/* ── Gain / loss on total scard ── */
+.scard-gain-row { display: flex; align-items: baseline; gap: 0.35rem; margin-top: 0.25rem; flex-wrap: wrap; }
+.scard-gain-val { font-size: 0.78rem; font-weight: 700; }
+.scard-gain-pct { font-size: 0.7rem; opacity: 0.9; }
+.gain-pos { color: var(--green); }
+.gain-neg { color: var(--coral); }
+
 /* ── Backfill banner ── */
 .backfill-banner {
   background: rgba(88,166,255,0.1);
@@ -408,6 +415,24 @@ canvas { width: 100% !important; }
 .modal-btns { display: flex; gap: 0.5rem; }
 .modal-btns .btn-primary, .modal-btns .btn-secondary { flex: 1; justify-content: center; }
 .auth-error { font-size: 0.8rem; color: #f85149; text-align: center; }
+
+/* ── History Tab ── */
+.seed-config-row {
+  display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.75rem 1.2rem; margin-bottom: 1.1rem;
+}
+.seed-info { display: flex; flex-direction: column; gap: 0.1rem; }
+.seed-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.seed-val { font-size: 1.15rem; font-weight: 700; color: var(--gold); }
+.history-chart-wrap { position: relative; height: 280px; }
+.history-chart-wrap canvas { height: 100% !important; }
+.hist-date  { color: var(--text-mid); font-size: 0.78rem; white-space: nowrap; }
+.hist-total { font-weight: 600; color: var(--faith); }
+.hist-pos   { color: var(--green); font-weight: 600; }
+.hist-neg   { color: var(--coral); font-weight: 600; }
+.hist-sub   { color: var(--text-muted); font-size: 0.8rem; }
+.history-table th, .history-table td { white-space: nowrap; }
 
 /* ── Retirement Tab ── */
 .ret-summary-grid {

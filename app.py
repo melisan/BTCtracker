@@ -550,6 +550,34 @@ def api_portfolio_history():
     return jsonify(rows)
 
 
+@app.route("/api/portfolio/history/weekly")
+def api_portfolio_history_weekly():
+    conn = get_db()
+    cur  = query(conn, """
+        SELECT date, total_krw, btc_total_krw, eth_total_krw,
+               us_total_krw, korean_total_krw, krw_total_krw
+        FROM portfolio_snapshots ORDER BY date ASC
+    """)
+    all_rows = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    # Group by ISO week; prefer the entry closest to Friday (weekday=4)
+    weeks = {}
+    for r in all_rows:
+        try:
+            dt = datetime.strptime(r["date"], "%Y-%m-%d")
+            year, week, _ = dt.isocalendar()
+            wk = f"{year}-W{week:02d}"
+            if wk not in weeks:
+                weeks[wk] = r
+            else:
+                existing = datetime.strptime(weeks[wk]["date"], "%Y-%m-%d")
+                if abs(dt.weekday() - 4) < abs(existing.weekday() - 4):
+                    weeks[wk] = r
+        except Exception:
+            pass
+    return jsonify(sorted(weeks.values(), key=lambda r: r["date"]))
+
+
 @app.route("/api/portfolio/backfill", methods=["POST"])
 def api_backfill():
     try:

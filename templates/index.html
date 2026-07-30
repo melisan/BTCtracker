@@ -35,6 +35,7 @@
     <button class="tab-btn" data-tab="korean" data-i18n="tab_korean">🌸 Korean</button>
     <button class="tab-btn" data-tab="crypto" data-i18n="tab_crypto">₿ Crypto</button>
     <button class="tab-btn" data-tab="krw" data-i18n="tab_krw">🐷 KRW</button>
+    <button class="tab-btn" data-tab="history" data-i18n="tab_history">📅 History</button>
     <button class="tab-btn" data-tab="retirement" data-i18n="tab_retirement">🌾 Retirement</button>
   </nav>
 
@@ -45,6 +46,10 @@
       <div class="scard scard-total">
         <div class="scard-label" data-i18n="scard_total">Total Harvest</div>
         <div id="sum-total" class="scard-value">—</div>
+        <div class="scard-gain-row">
+          <span id="sum-gain" class="scard-gain-val">—</span>
+          <span id="sum-gain-pct" class="scard-gain-pct">—</span>
+        </div>
       </div>
       <div class="scard scard-btc">
         <div class="scard-label" data-i18n="scard_btc">₿ Bitcoin</div>
@@ -261,6 +266,56 @@
         <button id="krw-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
+  </div>
+
+  <!-- ── HISTORY TAB ── -->
+  <div id="tab-history" class="tab-panel hidden">
+
+    <div class="seed-config-row">
+      <div class="seed-info">
+        <div class="seed-label" data-i18n="lbl_seed">Base Investment</div>
+        <div id="seed-display" class="seed-val">—</div>
+      </div>
+      <button id="seed-edit-btn" class="btn-edit-lock" title="Edit base investment">✎</button>
+      <div id="seed-edit-form" class="add-form hidden" style="margin:0;padding:0;border:none">
+        <input id="seed-inp" type="number" placeholder="1530000000" style="width:165px" />
+        <button id="seed-save-btn" class="btn-primary" data-i18n="btn_save">Save</button>
+        <button id="seed-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="chart_history">Weekly Portfolio Value</h2>
+      <div class="history-chart-wrap">
+        <div id="history-chart-empty" class="chart-empty" data-i18n="empty_history">No history yet — data builds as you update assets.</div>
+        <canvas id="history-chart" class="hidden"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="h2_history">Weekly Snapshots</h2>
+      <div style="overflow-x:auto">
+        <table class="table history-table">
+          <thead>
+            <tr>
+              <th data-i18n="th_date">Date</th>
+              <th data-i18n="th_total_val">Total (₩)</th>
+              <th data-i18n="th_vs_seed">vs Seed</th>
+              <th>%</th>
+              <th>BTC</th>
+              <th>ETH</th>
+              <th data-i18n="tab_us">US</th>
+              <th data-i18n="tab_korean">Korean</th>
+              <th data-i18n="tab_krw">KRW</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr class="empty-row"><td colspan="9">No snapshots yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── RETIREMENT TAB ── -->

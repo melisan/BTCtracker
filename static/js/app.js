@@ -42,7 +42,7 @@ const STRINGS = {
   en: {
     tab_total: "🌳 Overview",   tab_us: "📈 US Stocks",
     tab_korean: "🌸 Korean",    tab_crypto: "₿ Crypto",    tab_krw: "🐷 KRW",
-    tab_retirement: "🌾 Retirement",
+    tab_history: "📅 History",  tab_retirement: "🌾 Retirement",
     scard_total: "Total Harvest",  scard_btc: "₿ Bitcoin",  scard_eth: "Ξ Ethereum",
     scard_us: "📈 US Stocks",   scard_korean: "🌸 Korean",  scard_krw: "🐷 KRW Cash",
     chart_alloc: "Harvest Allocation",  chart_growth: "Growth Over Time 🌳",
@@ -64,6 +64,11 @@ const STRINGS = {
     empty_crypto_chart: "Add crypto holdings to see price chart.",
     empty_korean_chart: "Add Korean stock holdings to see price chart.",
     chart_korean_perf: "30-Day Korean Stock Performance 🌸",
+    chart_history: "Weekly Portfolio Value 📅",
+    h2_history: "Weekly Snapshots",
+    lbl_seed: "Base Investment",
+    empty_history: "No history yet — data builds as you update assets.",
+    th_date: "Date",  th_total_val: "Total (₩)",  th_vs_seed: "vs Seed",
     ph_us_label: "Label (e.g. Fidelity TSLA)",   ph_us_amount: "Shares",
     ph_us_type: "Ticker (e.g. TSLA)",
     ph_korean_label: "Label (e.g. 삼성전자)",       ph_korean_amount: "Shares",
@@ -99,7 +104,7 @@ const STRINGS = {
   ko: {
     tab_total: "🌳 개요",         tab_us: "📈 미국 주식",
     tab_korean: "🌸 한국 주식",   tab_crypto: "₿ 암호화폐",  tab_krw: "🐷 원화",
-    tab_retirement: "🌾 은퇴",
+    tab_history: "📅 이력",       tab_retirement: "🌾 은퇴",
     scard_total: "총 자산",       scard_btc: "₿ 비트코인",   scard_eth: "Ξ 이더리움",
     scard_us: "📈 미국 주식",     scard_korean: "🌸 한국 주식", scard_krw: "🐷 원화 현금",
     chart_alloc: "자산 배분",     chart_growth: "성장 추이 🌳",
@@ -121,6 +126,11 @@ const STRINGS = {
     empty_crypto_chart: "암호화폐를 추가하면 가격 차트가 표시됩니다.",
     empty_korean_chart: "한국 주식을 추가하면 가격 차트가 표시됩니다.",
     chart_korean_perf: "30일 한국 주식 추이 🌸",
+    chart_history: "주간 포트폴리오 가치 📅",
+    h2_history: "주간 스냅샷",
+    lbl_seed: "기준 투자금",
+    empty_history: "이력 없음 — 자산을 업데이트하면 데이터가 쌓입니다.",
+    th_date: "날짜",  th_total_val: "총액 (₩)",  th_vs_seed: "투자금 대비",
     ph_us_label: "라벨 (예: 피델리티 TSLA)",      ph_us_amount: "주수",
     ph_us_type: "종목 코드 (예: TSLA)",
     ph_korean_label: "라벨 (예: 삼성전자)",        ph_korean_amount: "주수",
@@ -179,15 +189,18 @@ let totalChart      = null;
 let usStocksChart   = null;
 let cryptoHistChart   = null;
 let koreanStocksChart = null;
+let historyChart      = null;
 let activeTab       = "total";
 let activeRange     = "daily";
 let normalizeMode   = false;
 let historyData     = [];
 let usHistoryData   = {};
+let weeklyHistData  = [];
 let isAuthenticated = false;
 let editMode        = false;
 let togglesWired    = false;
 let retirementParams = null;
+let seedFund = parseInt(localStorage.getItem("seedFund") || "") || 1530000000;
 
 // ── Retirement params ─────────────────────────────────────────
 function loadRetirementParams() {
@@ -312,6 +325,7 @@ function renderActiveTab() {
   if (activeTab === "korean")     renderKoreanTab();
   if (activeTab === "crypto")     renderCryptoTab();
   if (activeTab === "krw")        renderKRWTab();
+  if (activeTab === "history")    renderHistoryTab();
   if (activeTab === "retirement") renderRetirementTab();
 }
 
@@ -323,6 +337,21 @@ function updateSummaryCards(bd) {
   document.getElementById("sum-us").textContent     = fmtKRW.format(bd.us);
   document.getElementById("sum-korean").textContent = fmtKRW.format(bd.korean);
   document.getElementById("sum-krw").textContent    = fmtKRW.format(bd.krw);
+
+  // Gain vs seed fund
+  const gain    = bd.total - seedFund;
+  const gainPct = seedFund > 0 ? gain / seedFund * 100 : 0;
+  const pos     = gain >= 0;
+  const gainEl  = document.getElementById("sum-gain");
+  const pctEl   = document.getElementById("sum-gain-pct");
+  if (gainEl) {
+    gainEl.textContent = (pos ? "+" : "") + fmtKRW.format(gain);
+    gainEl.className   = "scard-gain-val " + (pos ? "gain-pos" : "gain-neg");
+  }
+  if (pctEl) {
+    pctEl.textContent = "(" + (pos ? "+" : "") + gainPct.toFixed(1) + "%)";
+    pctEl.className   = "scard-gain-pct " + (pos ? "gain-pos" : "gain-neg");
+  }
 }
 
 // ── Pie / Donut Chart ─────────────────────────────────────────
@@ -485,6 +514,111 @@ async function checkAndBackfill() {
       finally { banner.classList.add("hidden"); }
     }
   } catch (err) { document.getElementById("backfill-banner")?.classList.add("hidden"); }
+}
+
+// ── History Tab ───────────────────────────────────────────────
+const fmtShort = v => {
+  if (v == null) return "—";
+  const abs = Math.abs(v), neg = v < 0;
+  let s = abs >= 1e8 ? (abs/1e8).toFixed(1) + "억"
+        : abs >= 1e4 ? (abs/1e4).toFixed(0) + "만"
+        : abs.toLocaleString();
+  return (neg ? "-" : "") + s;
+};
+
+async function fetchWeeklyHistory() {
+  try {
+    const res = await fetch("/api/portfolio/history/weekly");
+    weeklyHistData = await res.json();
+    if (activeTab === "history") renderHistoryTab();
+  } catch (err) { console.error("Weekly history fetch failed:", err); }
+}
+
+function renderHistoryChart(data) {
+  const canvas = document.getElementById("history-chart");
+  const empty  = document.getElementById("history-chart-empty");
+  if (!canvas) return;
+  if (!data.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
+  canvas.classList.remove("hidden"); empty.classList.add("hidden");
+
+  const labels   = data.map(r => r.date);
+  const totals   = data.map(r => r.total_krw || 0);
+  const seedLine = data.map(() => seedFund);
+
+  const datasets = [
+    { label: lang === "ko" ? "포트폴리오" : "Portfolio",
+      data: totals, borderColor: "#e8b84b", backgroundColor: "transparent",
+      borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5,
+      fill: { target: 1, above: "rgba(76,175,125,0.13)", below: "rgba(224,123,106,0.13)" },
+      tension: 0.3 },
+    { label: lang === "ko" ? "기준 투자금" : "Seed Fund",
+      data: seedLine, borderColor: "rgba(232,184,75,0.45)",
+      backgroundColor: "transparent", borderWidth: 1.5,
+      borderDash: [7, 4], pointRadius: 0, fill: false, tension: 0 },
+  ];
+
+  const yFmt = v => v >= 1e8 ? (v/1e8).toFixed(0) + "억" : v >= 1e4 ? (v/1e4).toFixed(0) + "만" : v.toLocaleString();
+
+  if (historyChart) {
+    historyChart.data.labels = labels;
+    historyChart.data.datasets[0].data = totals;
+    historyChart.data.datasets[0].label = datasets[0].label;
+    historyChart.data.datasets[1].data  = seedLine;
+    historyChart.data.datasets[1].label = datasets[1].label;
+    historyChart.update("none");
+    return;
+  }
+  historyChart = new Chart(canvas.getContext("2d"), {
+    type: "line", data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: "#8b949e", font: { size: 11 }, boxWidth: 12, padding: 10 }},
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtKRW.format(ctx.parsed.y)}` }},
+      },
+      scales: {
+        x: { ticks: { color: "#6e7681", maxRotation: 0, maxTicksLimit: 12 }, grid: { color: "#21262d" }},
+        y: { ticks: { color: "#6e7681", callback: yFmt }, grid: { color: "#21262d" }},
+      },
+    },
+  });
+}
+
+function renderHistoryTable(data, S) {
+  const tbody = document.getElementById("history-tbody");
+  if (!tbody) return;
+  if (!data.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${S.empty_history}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = [...data].reverse().map(r => {
+    const total = r.total_krw || 0;
+    const gain  = total - seedFund;
+    const pct   = seedFund > 0 ? gain / seedFund * 100 : 0;
+    const cls   = gain >= 0 ? "hist-pos" : "hist-neg";
+    const sign  = gain >= 0 ? "+" : "";
+    return `<tr>
+      <td class="hist-date">${r.date}</td>
+      <td class="hist-total">${fmtKRW.format(total)}</td>
+      <td class="${cls}">${sign}${fmtShort(gain)}</td>
+      <td class="${cls}">${sign}${pct.toFixed(1)}%</td>
+      <td class="hist-sub">${fmtShort(r.btc_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.eth_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.us_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.korean_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.krw_total_krw)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderHistoryTab() {
+  const S = STRINGS[lang];
+  const seedEl = document.getElementById("seed-display");
+  if (seedEl) seedEl.textContent = fmtKRW.format(seedFund);
+  if (!weeklyHistData.length) { fetchWeeklyHistory(); return; }
+  renderHistoryChart(weeklyHistData);
+  renderHistoryTable(weeklyHistData, S);
 }
 
 // ── US Stock History Chart ────────────────────────────────────
@@ -1051,6 +1185,26 @@ wireAddForm("korean");
 wireAddForm("crypto");
 wireAddForm("krw", "KRW");
 
+// ── Seed fund editing ─────────────────────────────────────────
+document.getElementById("seed-edit-btn")?.addEventListener("click", () => {
+  const form = document.getElementById("seed-edit-form");
+  const inp  = document.getElementById("seed-inp");
+  if (inp) inp.value = seedFund;
+  form?.classList.toggle("hidden");
+});
+document.getElementById("seed-save-btn")?.addEventListener("click", () => {
+  const v = parseFloat(document.getElementById("seed-inp")?.value);
+  if (!isNaN(v) && v >= 0) {
+    seedFund = v;
+    localStorage.setItem("seedFund", String(v));
+    document.getElementById("seed-edit-form")?.classList.add("hidden");
+    renderActiveTab();
+  }
+});
+document.getElementById("seed-cancel-btn")?.addEventListener("click", () => {
+  document.getElementById("seed-edit-form")?.classList.add("hidden");
+});
+
 // ── Language toggle ───────────────────────────────────────────
 document.getElementById("lang-btn")?.addEventListener("click", () => {
   lang = lang === "en" ? "ko" : "en";
@@ -1071,5 +1225,6 @@ document.getElementById("refresh-btn").addEventListener("click", async () => {
   await fetchCryptoPrices();
   await Promise.all([fetchHoldings(), fetchHistory(), fetchStockPrices()]);
   await checkAndBackfill();
+  fetchWeeklyHistory();
   setInterval(fetchStockPrices, 300_000);
 })();
