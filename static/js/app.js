@@ -430,6 +430,12 @@ function renderLineChart(data) {
   const labels   = data.map(d => d.date);
   const datasets = SERIES.map((s, i) => {
     let values = data.map(d => d[s.key] || 0);
+    // Null-out extreme outliers (>100× or <1/100× of series median) before plotting
+    const nonZero = values.filter(v => v > 0).sort((a, b) => a - b);
+    if (nonZero.length >= 3) {
+      const med = nonZero[Math.floor(nonZero.length / 2)];
+      values = values.map(v => v > 0 && (v / med > 100 || v / med < 0.01) ? null : v);
+    }
     if (normalizeMode) {
       const nonZero = values.filter(v => v > 0);
       if (nonZero.length) {
