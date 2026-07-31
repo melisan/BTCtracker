@@ -260,6 +260,11 @@ function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll(".tab-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === tab));
+  if (tab === "history" && diagRows.length === 0) {
+    const date = document.getElementById("diag-date")?.value || "2026-06-19";
+    const days = parseInt(document.getElementById("diag-days")?.value || "14");
+    loadDiagnostics(date, days);
+  }
   document.querySelectorAll(".tab-panel").forEach(p =>
     p.classList.toggle("hidden", p.id !== `tab-${tab}`));
   renderActiveTab();
@@ -1517,17 +1522,16 @@ async function runAnomalyFix() {
   const btn = document.getElementById("fix-anomaly-btn");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Scanning…"; }
   try {
-    // First diagnose
     const diagRes = await fetch("/api/admin/diagnose-anomalies");
     const diag    = await diagRes.json();
     if (!diag.anomalies.length) {
-      alert("No anomalies detected in BTC price history.");
+      alert("No anomalies detected in BTC price or portfolio total history.");
       if (btn) { btn.disabled = false; btn.textContent = STRINGS[lang].btn_fix_anomalies; }
       return;
     }
     const msg = diag.anomalies.map(a =>
-      `${a.date}: ₩${Math.round(a.btc_price_krw/1e4)}만 (×${a.ratio} vs median ₩${Math.round(a.median_neighbors/1e4)}만)\nLikely: ${a.likely_cause}`
-    ).join("\n\n");
+      `${a.date} [${a.field}]: ${fmtShort(a.value)} (×${a.ratio} vs median ${fmtShort(a.median_neighbors)})`
+    ).join("\n");
     if (!confirm(`Found ${diag.anomalies.length} anomaly(ies):\n\n${msg}\n\nApply linear interpolation fix?`)) {
       if (btn) { btn.disabled = false; btn.textContent = STRINGS[lang].btn_fix_anomalies; }
       return;
@@ -1536,7 +1540,7 @@ async function runAnomalyFix() {
     const fixRes = await fetch("/api/admin/fix-anomalies", { method: "POST" });
     const fix    = await fixRes.json();
     const fixMsg = fix.details.map(f =>
-      `${f.date}: ₩${Math.round(f.old_btc_price/1e4)}만 → ₩${Math.round(f.new_btc_price/1e4)}만 (×${f.correction_ratio})`
+      `${f.date} [${f.field}]: ${fmtShort(f.old)} → ${fmtShort(f.new)} (×${f.ratio})`
     ).join("\n");
     alert(`Fixed ${fix.fixed} row(s):\n\n${fixMsg}`);
     // Refresh history data

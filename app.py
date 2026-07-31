@@ -607,9 +607,57 @@ def api_logs():
     return jsonify(rows)
 
 
+def _rolling_median(values, i, half_window=5):
+    """Return median of neighbors within half_window, excluding index i."""
+    neighbors = [values[j] for j in range(max(0, i - half_window),
+                                           min(len(values), i + half_window + 1))
+                 if j != i and values[j]]
+    if not neighbors:
+        return None
+    neighbors.sort()
+    return neighbors[len(neighbors) // 2]
+
+
+def _find_anomalies(rows, field, threshold=1.5):
+    """Return list of (index, row, value, median) for field outliers."""
+    values = [r[field] or 0 for r in rows]
+    out = []
+    for i, row in enumerate(rows):
+        v = values[i]
+        if not v:
+            continue
+        med = _rolling_median(values, i)
+        if med and (v / med > threshold or v / med < 1.0 / threshold):
+            out.append((i, row, v, med))
+    return out
+
+
+def _interpolate(rows_values, i, threshold=1.5):
+    """Find nearest clean neighbors and interpolate value at i."""
+    values = rows_values
+    med = _rolling_median(values, i)
+    if not med:
+        return None
+    left_v = left_i = right_v = right_i = None
+    for j in range(i - 1, max(-1, i - 30), -1):
+        nb = values[j]
+        if nb and (1.0 / threshold) < nb / med < threshold:
+            left_v, left_i = nb, j
+            break
+    for j in range(i + 1, min(len(values), i + 30)):
+        nb = values[j]
+        if nb and (1.0 / threshold) < nb / med < threshold:
+            right_v, right_i = nb, j
+            break
+    if left_v and right_v:
+        t = (i - left_i) / (right_i - left_i)
+        return left_v + t * (right_v - left_v)
+    return left_v or right_v
+
+
 @app.route("/api/admin/diagnose-anomalies")
 def api_diagnose_anomalies():
-    """Return raw snapshot data ±15 days around any detected btc_price_krw outlier."""
+    """Detect anomalies in btc_price_krw AND total_krw."""
     conn = get_db()
     rows = [dict(r) for r in query(conn, """
         SELECT id, date, btc_price_krw, btc_total_krw, eth_total_krw,
@@ -618,39 +666,32 @@ def api_diagnose_anomalies():
     """).fetchall()]
     conn.close()
     if len(rows) < 3:
-        return jsonify({"anomalies": [], "rows": rows})
+        return jsonify({"anomalies": [], "total_rows": len(rows)})
 
-    prices   = [r["btc_price_krw"] or 0 for r in rows]
-    anomalies = []
-    for i, row in enumerate(rows):
-        p = prices[i]
-        if not p:
-            continue
-        window = [prices[j] for j in range(max(0,i-5), min(len(prices),i+6)) if j != i and prices[j]]
-        if not window:
-            continue
-        window.sort()
-        median = window[len(window)//2]
-        if median and (p / median > 1.5 or p / median < 0.667):
-            ratio = p / median
-            kind  = "price_10x" if 8 < ratio < 12 else \
-                    "price_100x" if 80 < ratio < 120 else \
-                    "price_low_10x" if 0.08 < ratio < 0.12 else \
-                    "price_low_100x" if 0.008 < ratio < 0.012 else "other"
-            context = rows[max(0,i-3):i+4]
-            anomalies.append({"date": row["date"], "btc_price_krw": p,
-                               "median_neighbors": median, "ratio": round(ratio,3),
-                               "likely_cause": kind, "context": context})
+    seen_dates = set()
+    anomalies  = []
+    for field in ("btc_price_krw", "total_krw"):
+        for (_, row, v, med) in _find_anomalies(rows, field):
+            key = (row["date"], field)
+            if key in seen_dates:
+                continue
+            seen_dates.add(key)
+            ratio = v / med
+            anomalies.append({
+                "date": row["date"], "field": field,
+                "value": round(v), "median_neighbors": round(med),
+                "ratio": round(ratio, 3),
+            })
+    anomalies.sort(key=lambda a: a["date"])
     return jsonify({"anomalies": anomalies, "total_rows": len(rows)})
 
 
 @app.route("/api/admin/fix-anomalies", methods=["POST"])
 def api_fix_anomalies():
     """
-    Detect and correct btc_price_krw outliers via linear interpolation.
-    Threshold: price deviates >2.5× or <0.4× of 5-day rolling median.
-    Corrects btc_total_krw and total_krw proportionally.
-    Returns list of corrected rows.
+    Fix outliers in both btc_price_krw and total_krw via linear interpolation.
+    When btc_price_krw is bad, also corrects btc_total_krw and total_krw proportionally.
+    When total_krw alone is bad, interpolates it directly.
     """
     conn = get_db()
     rows = [dict(r) for r in query(conn, """
@@ -658,59 +699,60 @@ def api_fix_anomalies():
         FROM portfolio_snapshots ORDER BY date
     """).fetchall()]
 
-    prices = [r["btc_price_krw"] or 0 for r in rows]
-    fixed  = []
+    fixed      = []
+    fixed_ids  = set()
+    THRESHOLD  = 1.5
 
+    # Pass 1: fix btc_price_krw anomalies (also fixes btc_total_krw + total_krw)
+    prices = [r["btc_price_krw"] or 0 for r in rows]
     for i, row in enumerate(rows):
         p = prices[i]
         if not p:
             continue
-        window = [prices[j] for j in range(max(0,i-5), min(len(prices),i+6)) if j != i and prices[j]]
-        if not window:
+        med = _rolling_median(prices, i)
+        if not med or not (p / med > THRESHOLD or p / med < 1.0 / THRESHOLD):
             continue
-        window.sort()
-        median = window[len(window)//2]
-        if not median or not (p / median > 1.5 or p / median < 0.667):
+        corrected = _interpolate(prices, i, THRESHOLD)
+        if not corrected:
             continue
-
-        # Find nearest valid (non-anomalous) neighbors for interpolation
-        left_p = left_i = right_p = right_i = None
-        for j in range(i-1, max(-1, i-20), -1):
-            nb = prices[j]
-            if nb and 0.667 < nb/median < 1.5:
-                left_p, left_i = nb, j
-                break
-        for j in range(i+1, min(len(prices), i+20)):
-            nb = prices[j]
-            if nb and 0.667 < nb/median < 1.5:
-                right_p, right_i = nb, j
-                break
-
-        if left_p and right_p:
-            t = (i - left_i) / (right_i - left_i)
-            corrected_price = left_p + t * (right_p - left_p)
-        elif left_p:
-            corrected_price = left_p
-        elif right_p:
-            corrected_price = right_p
-        else:
-            continue
-
-        ratio             = corrected_price / p
-        old_btc_total     = row["btc_total_krw"] or 0
-        new_btc_total     = old_btc_total * ratio
-        new_total         = (row["total_krw"] or 0) - old_btc_total + new_btc_total
-
+        ratio         = corrected / p
+        old_btc_total = row["btc_total_krw"] or 0
+        new_btc_total = old_btc_total * ratio
+        new_total     = (row["total_krw"] or 0) - old_btc_total + new_btc_total
         query(conn, """
             UPDATE portfolio_snapshots
-            SET btc_price_krw = %s, btc_total_krw = %s, total_krw = %s
-            WHERE id = %s
-        """, (corrected_price, new_btc_total, new_total, row["id"]))
+            SET btc_price_krw = %s, btc_total_krw = %s, total_krw = %s WHERE id = %s
+        """, (corrected, new_btc_total, new_total, row["id"]))
+        fixed_ids.add(row["id"])
+        fixed.append({"date": row["date"], "field": "btc_price_krw",
+                      "old": round(p), "new": round(corrected),
+                      "ratio": round(ratio, 4)})
 
-        fixed.append({"date": row["date"],
-                      "old_btc_price": round(p), "new_btc_price": round(corrected_price),
-                      "correction_ratio": round(ratio, 4),
-                      "old_btc_total": round(old_btc_total), "new_btc_total": round(new_btc_total)})
+    # Reload after pass 1 so pass 2 sees updated total_krw values
+    rows = [dict(r) for r in query(conn, """
+        SELECT id, date, btc_price_krw, btc_total_krw, total_krw
+        FROM portfolio_snapshots ORDER BY date
+    """).fetchall()]
+
+    # Pass 2: fix total_krw anomalies not already handled
+    totals = [r["total_krw"] or 0 for r in rows]
+    for i, row in enumerate(rows):
+        if row["id"] in fixed_ids:
+            continue
+        t = totals[i]
+        if not t:
+            continue
+        med = _rolling_median(totals, i)
+        if not med or not (t / med > THRESHOLD or t / med < 1.0 / THRESHOLD):
+            continue
+        corrected = _interpolate(totals, i, THRESHOLD)
+        if not corrected:
+            continue
+        query(conn, "UPDATE portfolio_snapshots SET total_krw = %s WHERE id = %s",
+              (corrected, row["id"]))
+        fixed.append({"date": row["date"], "field": "total_krw",
+                      "old": round(t), "new": round(corrected),
+                      "ratio": round(corrected / t, 4)})
 
     conn.commit()
     conn.close()
