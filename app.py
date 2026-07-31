@@ -607,46 +607,61 @@ def api_logs():
     return jsonify(rows)
 
 
-def _rolling_median(values, i, half_window=5):
-    """Return median of neighbors within half_window, excluding index i."""
+def _robust_reference(values, i, half_window=30):
+    """
+    Return a robust reference value for index i.
+    Uses wide-window neighbors (30 days each side) to resist clusters of bad rows.
+    Falls back to global median if not enough local data.
+    """
     neighbors = [values[j] for j in range(max(0, i - half_window),
                                            min(len(values), i + half_window + 1))
                  if j != i and values[j]]
+    # Prefer global fallback when local window is sparse
+    if len(neighbors) < 5:
+        global_vals = [v for v in values if v]
+        neighbors = global_vals if global_vals else neighbors
     if not neighbors:
         return None
     neighbors.sort()
-    return neighbors[len(neighbors) // 2]
+    # Use 25th–75th percentile median to ignore outliers in the window itself
+    lo = len(neighbors) // 4
+    hi = len(neighbors) * 3 // 4
+    trimmed = neighbors[lo:hi+1] if hi > lo else neighbors
+    return trimmed[len(trimmed) // 2]
+
+
+# Keep alias for backwards compat
+_rolling_median = _robust_reference
 
 
 def _find_anomalies(rows, field, threshold=1.5):
-    """Return list of (index, row, value, median) for field outliers."""
+    """Return list of (index, row, value, ref) for field outliers."""
     values = [r[field] or 0 for r in rows]
     out = []
     for i, row in enumerate(rows):
         v = values[i]
         if not v:
             continue
-        med = _rolling_median(values, i)
-        if med and (v / med > threshold or v / med < 1.0 / threshold):
-            out.append((i, row, v, med))
+        ref = _robust_reference(values, i)
+        if ref and (v / ref > threshold or v / ref < 1.0 / threshold):
+            out.append((i, row, v, ref))
     return out
 
 
-def _interpolate(rows_values, i, threshold=1.5):
-    """Find nearest clean neighbors and interpolate value at i."""
-    values = rows_values
-    med = _rolling_median(values, i)
-    if not med:
+def _interpolate(values, i, threshold=1.5):
+    """Find nearest clean neighbors and linearly interpolate value at index i."""
+    ref = _robust_reference(values, i)
+    if not ref:
         return None
     left_v = left_i = right_v = right_i = None
-    for j in range(i - 1, max(-1, i - 30), -1):
+    for j in range(i - 1, max(-1, i - 60), -1):
         nb = values[j]
-        if nb and (1.0 / threshold) < nb / med < threshold:
+        if nb and (1.0 / threshold) < nb / ref < threshold:
             left_v, left_i = nb, j
             break
-    for j in range(i + 1, min(len(values), i + 30)):
+    for j in range(i + 1, min(len(values), i + 60)):
         nb = values[j]
-        if nb and (1.0 / threshold) < nb / med < threshold:
+        if nb and (1.0 / threshold) < nb / ref < threshold:
             right_v, right_i = nb, j
             break
     if left_v and right_v:
@@ -709,7 +724,7 @@ def api_fix_anomalies():
         p = prices[i]
         if not p:
             continue
-        med = _rolling_median(prices, i)
+        med = _robust_reference(prices, i)
         if not med or not (p / med > THRESHOLD or p / med < 1.0 / THRESHOLD):
             continue
         corrected = _interpolate(prices, i, THRESHOLD)
@@ -742,7 +757,7 @@ def api_fix_anomalies():
         t = totals[i]
         if not t:
             continue
-        med = _rolling_median(totals, i)
+        med = _robust_reference(totals, i)
         if not med or not (t / med > THRESHOLD or t / med < 1.0 / THRESHOLD):
             continue
         corrected = _interpolate(totals, i, THRESHOLD)
@@ -763,7 +778,7 @@ def api_fix_anomalies():
 def api_admin_snapshots():
     """Return raw snapshot rows around a date for manual inspection."""
     around = request.args.get("around", "").strip()
-    days   = min(int(request.args.get("days", 14)), 60)
+    days   = min(int(request.args.get("days", 14)), 1000)
     conn   = get_db()
     try:
         if around:
@@ -778,11 +793,12 @@ def api_admin_snapshots():
                 WHERE date >= %s AND date <= %s ORDER BY date
             """, (start, end)).fetchall()]
         else:
+            # Return all rows when no center date specified
             rows = [dict(r) for r in query(conn, """
                 SELECT id, date, btc_price_krw, btc_total_krw,
                        eth_price_krw, eth_total_krw,
                        us_total_krw, korean_total_krw, krw_total_krw, total_krw
-                FROM portfolio_snapshots ORDER BY date DESC LIMIT 30
+                FROM portfolio_snapshots ORDER BY date
             """).fetchall()]
     except Exception as e:
         conn.close()

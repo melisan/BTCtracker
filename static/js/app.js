@@ -261,9 +261,7 @@ function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === tab));
   if (tab === "history" && diagRows.length === 0) {
-    const date = document.getElementById("diag-date")?.value || "2026-06-19";
-    const days = parseInt(document.getElementById("diag-days")?.value || "14");
-    loadDiagnostics(date, days);
+    loadAllDiagnostics();
   }
   document.querySelectorAll(".tab-panel").forEach(p =>
     p.classList.toggle("hidden", p.id !== `tab-${tab}`));
@@ -1358,6 +1356,8 @@ document.getElementById("diag-load-btn")?.addEventListener("click", () => {
   loadDiagnostics(date, days);
 });
 
+document.getElementById("diag-all-btn")?.addEventListener("click", loadAllDiagnostics);
+
 document.getElementById("diag-patch-cancel")?.addEventListener("click", () => {
   document.getElementById("diag-patch-form")?.classList.add("hidden");
   diagPatchRow = null;
@@ -1365,13 +1365,34 @@ document.getElementById("diag-patch-cancel")?.addEventListener("click", () => {
 
 document.getElementById("diag-patch-save")?.addEventListener("click", saveDiagPatch);
 
+async function loadAllDiagnostics() {
+  const status = document.getElementById("diag-status");
+  if (status) status.textContent = "Loading all snapshots…";
+  try {
+    const res = await fetch("/api/admin/snapshots?days=365");
+    diagRows  = await res.json();
+    if (status) {
+      const anom = diagRows.filter((r, i) =>
+        ["btc_price_krw","btc_total_krw","total_krw"].some(f => detectDiagAnomaly(diagRows, i, f))
+      ).length;
+      status.textContent = `${diagRows.length} total rows · ${anom} anomalous (red)`;
+    }
+    renderDiagTable();
+  } catch (err) {
+    if (status) status.textContent = "Error: " + err.message;
+  }
+}
+
 async function loadDiagnostics(date, days) {
   const status = document.getElementById("diag-status");
   if (status) status.textContent = "Loading…";
   try {
-    const res = await fetch(`/api/admin/snapshots?around=${encodeURIComponent(date)}&days=${days}`);
+    const url = date
+      ? `/api/admin/snapshots?around=${encodeURIComponent(date)}&days=${days}`
+      : `/api/admin/snapshots?days=365`;
+    const res = await fetch(url);
     diagRows  = await res.json();
-    if (status) status.textContent = `${diagRows.length} row(s) found around ${date}`;
+    if (status) status.textContent = `${diagRows.length} row(s) loaded`;
     renderDiagTable();
   } catch (err) {
     if (status) status.textContent = "Error: " + err.message;
