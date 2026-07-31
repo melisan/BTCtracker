@@ -100,6 +100,14 @@ def init_db():
             ALTER TABLE portfolio_snapshots
             ADD COLUMN IF NOT EXISTS {col} DOUBLE PRECISION DEFAULT 0
         """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tab_notes (
+            id         SERIAL PRIMARY KEY,
+            tab        TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
     conn.commit()
     cur.close()
     conn.close()
@@ -597,6 +605,158 @@ def api_logs():
         if isinstance(r.get("changed_at"), datetime):
             r["changed_at"] = r["changed_at"].isoformat()
     return jsonify(rows)
+
+
+@app.route("/api/admin/diagnose-anomalies")
+def api_diagnose_anomalies():
+    """Return raw snapshot data ±15 days around any detected btc_price_krw outlier."""
+    conn = get_db()
+    rows = [dict(r) for r in query(conn, """
+        SELECT id, date, btc_price_krw, btc_total_krw, eth_total_krw,
+               us_total_krw, korean_total_krw, krw_total_krw, total_krw
+        FROM portfolio_snapshots ORDER BY date
+    """).fetchall()]
+    conn.close()
+    if len(rows) < 3:
+        return jsonify({"anomalies": [], "rows": rows})
+
+    prices   = [r["btc_price_krw"] or 0 for r in rows]
+    anomalies = []
+    for i, row in enumerate(rows):
+        p = prices[i]
+        if not p:
+            continue
+        window = [prices[j] for j in range(max(0,i-5), min(len(prices),i+6)) if j != i and prices[j]]
+        if not window:
+            continue
+        window.sort()
+        median = window[len(window)//2]
+        if median and (p / median > 2.5 or p / median < 0.4):
+            ratio = p / median
+            kind  = "price_10x" if 8 < ratio < 12 else \
+                    "price_100x" if 80 < ratio < 120 else \
+                    "price_low_10x" if 0.08 < ratio < 0.12 else \
+                    "price_low_100x" if 0.008 < ratio < 0.012 else "other"
+            context = rows[max(0,i-3):i+4]
+            anomalies.append({"date": row["date"], "btc_price_krw": p,
+                               "median_neighbors": median, "ratio": round(ratio,3),
+                               "likely_cause": kind, "context": context})
+    return jsonify({"anomalies": anomalies, "total_rows": len(rows)})
+
+
+@app.route("/api/admin/fix-anomalies", methods=["POST"])
+def api_fix_anomalies():
+    """
+    Detect and correct btc_price_krw outliers via linear interpolation.
+    Threshold: price deviates >2.5× or <0.4× of 5-day rolling median.
+    Corrects btc_total_krw and total_krw proportionally.
+    Returns list of corrected rows.
+    """
+    conn = get_db()
+    rows = [dict(r) for r in query(conn, """
+        SELECT id, date, btc_price_krw, btc_total_krw, total_krw
+        FROM portfolio_snapshots ORDER BY date
+    """).fetchall()]
+
+    prices = [r["btc_price_krw"] or 0 for r in rows]
+    fixed  = []
+
+    for i, row in enumerate(rows):
+        p = prices[i]
+        if not p:
+            continue
+        window = [prices[j] for j in range(max(0,i-5), min(len(prices),i+6)) if j != i and prices[j]]
+        if not window:
+            continue
+        window.sort()
+        median = window[len(window)//2]
+        if not median or not (p / median > 2.5 or p / median < 0.4):
+            continue
+
+        # Find nearest valid (non-anomalous) neighbors for interpolation
+        left_p = left_i = right_p = right_i = None
+        for j in range(i-1, max(-1, i-20), -1):
+            nb = prices[j]
+            if nb and 0.4 < nb/median < 2.5:
+                left_p, left_i = nb, j
+                break
+        for j in range(i+1, min(len(prices), i+20)):
+            nb = prices[j]
+            if nb and 0.4 < nb/median < 2.5:
+                right_p, right_i = nb, j
+                break
+
+        if left_p and right_p:
+            t = (i - left_i) / (right_i - left_i)
+            corrected_price = left_p + t * (right_p - left_p)
+        elif left_p:
+            corrected_price = left_p
+        elif right_p:
+            corrected_price = right_p
+        else:
+            continue
+
+        ratio             = corrected_price / p
+        old_btc_total     = row["btc_total_krw"] or 0
+        new_btc_total     = old_btc_total * ratio
+        new_total         = (row["total_krw"] or 0) - old_btc_total + new_btc_total
+
+        query(conn, """
+            UPDATE portfolio_snapshots
+            SET btc_price_krw = %s, btc_total_krw = %s, total_krw = %s
+            WHERE id = %s
+        """, (corrected_price, new_btc_total, new_total, row["id"]))
+
+        fixed.append({"date": row["date"],
+                      "old_btc_price": round(p), "new_btc_price": round(corrected_price),
+                      "correction_ratio": round(ratio, 4),
+                      "old_btc_total": round(old_btc_total), "new_btc_total": round(new_btc_total)})
+
+    conn.commit()
+    conn.close()
+    return jsonify({"fixed": len(fixed), "details": fixed})
+
+
+# ── Notes (per-tab journal) ───────────────────────────────────
+
+@app.route("/api/notes")
+def api_get_notes():
+    tab  = request.args.get("tab", "").strip()
+    conn = get_db()
+    cur  = query(conn, """
+        SELECT id, tab, content, created_at
+        FROM tab_notes WHERE tab = %s ORDER BY created_at DESC
+    """, (tab,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    for r in rows:
+        if isinstance(r.get("created_at"), datetime):
+            r["created_at"] = r["created_at"].isoformat()
+    return jsonify(rows)
+
+
+@app.route("/api/notes", methods=["POST"])
+def api_add_note():
+    data    = request.get_json() or {}
+    tab     = (data.get("tab") or "").strip()
+    content = (data.get("content") or "").strip()
+    if not tab or not content:
+        return jsonify({"error": "Missing tab or content"}), 400
+    conn = get_db()
+    cur  = query(conn, "INSERT INTO tab_notes (tab, content) VALUES (%s, %s) RETURNING id", (tab, content))
+    nid  = cur.fetchone()["id"]
+    conn.commit()
+    conn.close()
+    return jsonify({"id": nid}), 201
+
+
+@app.route("/api/notes/<int:nid>", methods=["DELETE"])
+def api_delete_note(nid):
+    conn = get_db()
+    query(conn, "DELETE FROM tab_notes WHERE id = %s", (nid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 init_db()

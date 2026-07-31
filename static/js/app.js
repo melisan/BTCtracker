@@ -100,6 +100,9 @@ const STRINGS = {
     ret_note_kyowon: "※ Official figures from 교원공제회 (2026-06-19). Update annually.",
     ret_note_sakhak: "※ Pension = career avg monthly income × service years × 1.7%. Subject to income caps and pension reform.",
     lbl_yr: "yr",  lbl_mo: "mo",
+    h2_notes: "Notes",  ph_note: "Write a note…",  btn_note_add: "Add Note",
+    notes_empty: "No notes yet.",
+    btn_fix_anomalies: "🔧 Fix Price Anomalies",
   },
   ko: {
     tab_total: "🌳 개요",         tab_us: "📈 미국 주식",
@@ -162,6 +165,9 @@ const STRINGS = {
     ret_note_kyowon: "※ 교원공제회 공식 조회 결과 (2026-06-19 기준). 매년 업데이트 권장.",
     ret_note_sakhak: "※ 연금액 = 평균기준소득월액 × 재직연수 × 1.7%. 소득상한 및 개혁 내용에 따라 실제 금액 상이.",
     lbl_yr: "년",  lbl_mo: "개월",
+    h2_notes: "노트",  ph_note: "노트를 입력하세요…",  btn_note_add: "노트 추가",
+    notes_empty: "노트가 없습니다.",
+    btn_fix_anomalies: "🔧 가격 오류 수정",
   },
 };
 
@@ -200,7 +206,8 @@ let isAuthenticated = false;
 let editMode        = false;
 let togglesWired    = false;
 let retirementParams = null;
-let seedFund = parseInt(localStorage.getItem("seedFund") || "") || 1530000000;
+let seedFund   = parseInt(localStorage.getItem("seedFund") || "") || 1530000000;
+let notesCache = {}; // tabId → [{id, content, created_at}]
 
 // ── Retirement params ─────────────────────────────────────────
 function loadRetirementParams() {
@@ -619,6 +626,8 @@ function renderHistoryTab() {
   if (!weeklyHistData.length) { fetchWeeklyHistory(); return; }
   renderHistoryChart(weeklyHistData);
   renderHistoryTable(weeklyHistData, S);
+  // Pre-open notes for history tab and fetch if needed
+  if (!notesCache["history"]) fetchTabNotes("history");
 }
 
 // ── US Stock History Chart ────────────────────────────────────
@@ -1204,6 +1213,7 @@ document.getElementById("seed-save-btn")?.addEventListener("click", () => {
 document.getElementById("seed-cancel-btn")?.addEventListener("click", () => {
   document.getElementById("seed-edit-form")?.classList.add("hidden");
 });
+document.getElementById("fix-anomaly-btn")?.addEventListener("click", runAnomalyFix);
 
 // ── Language toggle ───────────────────────────────────────────
 document.getElementById("lang-btn")?.addEventListener("click", () => {
@@ -1219,9 +1229,154 @@ document.getElementById("refresh-btn").addEventListener("click", async () => {
   await Promise.all([fetchCryptoPrices(), fetchStockPrices()]);
 });
 
+// ── Notes (per-tab cumulative journal) ───────────────────────
+const NOTE_TABS = ["total","us","korean","crypto","krw","history","retirement"];
+
+function setupNotesSections() {
+  NOTE_TABS.forEach(tabId => {
+    const panel = document.getElementById(`tab-${tabId}`);
+    if (!panel) return;
+    const sec = document.createElement("div");
+    sec.id        = `notes-sec-${tabId}`;
+    sec.className = "notes-section";
+    sec.innerHTML = `
+      <div class="notes-header-row" data-notes-toggle="${tabId}">
+        <span class="notes-icon">📝</span>
+        <span class="notes-title" data-i18n="h2_notes">Notes</span>
+        <span class="notes-count" id="notes-count-${tabId}"></span>
+        <span class="notes-chevron" id="notes-chev-${tabId}">▸</span>
+      </div>
+      <div class="notes-body hidden" id="notes-body-${tabId}">
+        <div class="notes-list" id="notes-list-${tabId}"></div>
+        <div class="notes-add-row">
+          <textarea id="notes-inp-${tabId}" class="notes-input" rows="2"
+            placeholder="Write a note…" data-i18n-placeholder="ph_note"></textarea>
+          <button class="btn-primary notes-save" data-tab="${tabId}"
+            data-i18n="btn_note_add">Add Note</button>
+        </div>
+      </div>`;
+    panel.appendChild(sec);
+
+    sec.querySelector(`[data-notes-toggle]`).addEventListener("click", () => {
+      const body = document.getElementById(`notes-body-${tabId}`);
+      const chev = document.getElementById(`notes-chev-${tabId}`);
+      const open = body.classList.toggle("hidden");
+      chev.textContent = open ? "▸" : "▾";
+      if (!open && !notesCache[tabId]) fetchTabNotes(tabId);
+    });
+
+    sec.querySelector(".notes-save").addEventListener("click", async () => {
+      const inp = document.getElementById(`notes-inp-${tabId}`);
+      const content = inp?.value.trim();
+      if (!content) return;
+      if (!isAuthenticated) { showAuthModal(async () => { isAuthenticated = true; await saveNote(tabId, content, inp); }); return; }
+      await saveNote(tabId, content, inp);
+    });
+  });
+}
+
+async function saveNote(tabId, content, inp) {
+  const res = await fetch("/api/notes", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tab: tabId, content }),
+  });
+  if (res.ok) {
+    inp.value = "";
+    delete notesCache[tabId];
+    await fetchTabNotes(tabId);
+  }
+}
+
+async function fetchTabNotes(tabId) {
+  try {
+    const res = await fetch(`/api/notes?tab=${tabId}`);
+    notesCache[tabId] = await res.json();
+    renderTabNotes(tabId);
+  } catch (err) { console.error("Notes fetch failed:", err); }
+}
+
+function renderTabNotes(tabId) {
+  const S      = STRINGS[lang];
+  const list   = document.getElementById(`notes-list-${tabId}`);
+  const countEl = document.getElementById(`notes-count-${tabId}`);
+  if (!list) return;
+  const notes = notesCache[tabId] || [];
+  if (countEl) countEl.textContent = notes.length ? `(${notes.length})` : "";
+  if (!notes.length) {
+    list.innerHTML = `<div class="notes-empty">${S.notes_empty}</div>`;
+    return;
+  }
+  list.innerHTML = notes.map(n => {
+    const dt  = new Date(n.created_at);
+    const ts  = dt.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year:"numeric", month:"short", day:"numeric" })
+              + " " + dt.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+    return `<div class="note-item" data-note-id="${n.id}">
+      <div class="note-meta">
+        <span class="note-ts">${ts}</span>
+        <button class="note-del btn-del" data-id="${n.id}" data-tab="${tabId}" title="Delete">✕</button>
+      </div>
+      <div class="note-content">${escHtml(n.content)}</div>
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll(".note-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const nid = +btn.dataset.id, tab = btn.dataset.tab;
+      if (!isAuthenticated) { showAuthModal(async () => { isAuthenticated = true; await deleteNote(nid, tab); }); return; }
+      await deleteNote(nid, tab);
+    });
+  });
+}
+
+async function deleteNote(nid, tabId) {
+  await fetch(`/api/notes/${nid}`, { method: "DELETE" });
+  delete notesCache[tabId];
+  await fetchTabNotes(tabId);
+}
+
+// ── Anomaly fix (History tab admin tool) ─────────────────────
+async function runAnomalyFix() {
+  const btn = document.getElementById("fix-anomaly-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Scanning…"; }
+  try {
+    // First diagnose
+    const diagRes = await fetch("/api/admin/diagnose-anomalies");
+    const diag    = await diagRes.json();
+    if (!diag.anomalies.length) {
+      alert("No anomalies detected in BTC price history.");
+      if (btn) { btn.disabled = false; btn.textContent = STRINGS[lang].btn_fix_anomalies; }
+      return;
+    }
+    const msg = diag.anomalies.map(a =>
+      `${a.date}: ₩${Math.round(a.btc_price_krw/1e4)}만 (×${a.ratio} vs median ₩${Math.round(a.median_neighbors/1e4)}만)\nLikely: ${a.likely_cause}`
+    ).join("\n\n");
+    if (!confirm(`Found ${diag.anomalies.length} anomaly(ies):\n\n${msg}\n\nApply linear interpolation fix?`)) {
+      if (btn) { btn.disabled = false; btn.textContent = STRINGS[lang].btn_fix_anomalies; }
+      return;
+    }
+    if (btn) btn.textContent = "⏳ Fixing…";
+    const fixRes = await fetch("/api/admin/fix-anomalies", { method: "POST" });
+    const fix    = await fixRes.json();
+    const fixMsg = fix.details.map(f =>
+      `${f.date}: ₩${Math.round(f.old_btc_price/1e4)}만 → ₩${Math.round(f.new_btc_price/1e4)}만 (×${f.correction_ratio})`
+    ).join("\n");
+    alert(`Fixed ${fix.fixed} row(s):\n\n${fixMsg}`);
+    // Refresh history data
+    weeklyHistData = [];
+    historyData    = [];
+    await Promise.all([fetchHistory(), fetchWeeklyHistory()]);
+    renderActiveTab();
+  } catch (err) {
+    alert("Error: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = STRINGS[lang].btn_fix_anomalies; }
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────
 (async () => {
   loadRetirementParams();
+  setupNotesSections();
   await fetchCryptoPrices();
   await Promise.all([fetchHoldings(), fetchHistory(), fetchStockPrices()]);
   await checkAndBackfill();
