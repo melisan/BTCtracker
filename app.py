@@ -543,7 +543,12 @@ def api_portfolio_history():
             try:
                 dt = datetime.strptime(r["date"], "%Y-%m-%d")
                 wk = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
-                weeks[wk] = r
+                if wk not in weeks:
+                    weeks[wk] = r
+                else:
+                    existing = datetime.strptime(weeks[wk]["date"], "%Y-%m-%d")
+                    if abs(dt.weekday() - 4) < abs(existing.weekday() - 4):
+                        weeks[wk] = r
             except Exception:
                 pass
         rows = list(weeks.values())[-52:]
