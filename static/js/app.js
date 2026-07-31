@@ -619,11 +619,11 @@ function renderHistoryTable(data, S) {
       <td class="hist-total">${fmtKRW.format(total)}</td>
       <td class="${cls}">${sign}${fmtShort(gain)}</td>
       <td class="${cls}">${sign}${pct.toFixed(1)}%</td>
-      <td class="hist-sub">${fmtShort(r.btc_total_krw)}</td>
-      <td class="hist-sub">${fmtShort(r.eth_total_krw)}</td>
-      <td class="hist-sub">${fmtShort(r.us_total_krw)}</td>
-      <td class="hist-sub">${fmtShort(r.korean_total_krw)}</td>
-      <td class="hist-sub">${fmtShort(r.krw_total_krw)}</td>
+      <td class="hist-sub">${r.btc_total_krw    ? fmtShort(r.btc_total_krw)    : "—"}</td>
+      <td class="hist-sub">${r.eth_total_krw    ? fmtShort(r.eth_total_krw)    : "—"}</td>
+      <td class="hist-sub">${r.us_total_krw     ? fmtShort(r.us_total_krw)     : "—"}</td>
+      <td class="hist-sub">${r.korean_total_krw ? fmtShort(r.korean_total_krw) : "—"}</td>
+      <td class="hist-sub">${r.krw_total_krw    ? fmtShort(r.krw_total_krw)    : "—"}</td>
     </tr>`;
   }).join("");
 }

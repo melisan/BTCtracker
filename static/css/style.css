@@ -78,7 +78,7 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 /* ── Summary Cards (Total tab) ── */
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.75rem; margin-bottom: 1.25rem;
 }
 .scard {
@@ -93,16 +93,20 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 }
 .scard-value { font-size: 1.15rem; font-weight: 700; color: var(--faith); }
 .scard-total  {
+  grid-column: 1 / -1;
   background: linear-gradient(135deg, #221e10 0%, #1a1712 100%);
-  border-color: rgba(232,184,75,0.35); border-left: 3px solid var(--gold);
+  border-color: rgba(232,184,75,0.45); border-left: 3px solid var(--gold);
   position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem;
 }
 .scard-total::after {
-  content: "✝"; position: absolute; top: 0.4rem; right: 0.7rem;
-  color: var(--gold); opacity: 0.12; font-size: 1.8rem; line-height: 1; pointer-events: none;
+  content: "✝"; position: absolute; top: 0.5rem; right: 1rem;
+  color: var(--gold); opacity: 0.12; font-size: 2.8rem; line-height: 1; pointer-events: none;
 }
-.scard-total  .scard-value { color: var(--gold); font-size: 1.3rem; }
-.scard-total  .scard-label { color: #c9a65c; }
+.scard-total .scard-label { font-size: 0.72rem; color: #c9a65c; }
+.scard-total .scard-value { color: var(--gold); font-size: 1.9rem; font-weight: 700; }
+.scard-total .scard-gain-row { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .scard-btc    { border-color: rgba(247,147,26,0.25); }
 .scard-btc    .scard-value { color: var(--btc); }
 .scard-eth    { border-color: rgba(98,126,234,0.25); }
@@ -602,7 +606,7 @@ canvas { width: 100% !important; }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
-  .summary-grid { grid-template-columns: repeat(3, 1fr); }
+  .summary-grid { grid-template-columns: repeat(5, 1fr); }
   .ret-summary-grid { grid-template-columns: repeat(2, 1fr); }
   .ret-params-grid  { grid-template-columns: repeat(3, 1fr); }
   .ret-proj-grid    { grid-template-columns: repeat(2, 1fr); }
@@ -612,7 +616,7 @@ canvas { width: 100% !important; }
   .pie-wrap { height: 180px; }
 }
 @media (max-width: 560px) {
-  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .summary-grid { grid-template-columns: repeat(3, 1fr); }
   .ret-summary-grid { grid-template-columns: repeat(2, 1fr); }
   .ret-params-grid  { grid-template-columns: repeat(2, 1fr); }
   .ret-proj-grid    { grid-template-columns: 1fr 1fr; }
