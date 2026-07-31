@@ -886,7 +886,62 @@ def api_delete_note(nid):
     return jsonify({"ok": True})
 
 
+def clean_snapshot_outliers():
+    """
+    Run once at startup: fix any btc_total_krw or total_krw values that are
+    >100× the series median (catches extreme data-entry errors automatically).
+    """
+    if not DATABASE_URL:
+        return
+    try:
+        conn = get_db()
+        rows = [dict(r) for r in query(conn, """
+            SELECT id, date, btc_price_krw, btc_total_krw, total_krw
+            FROM portfolio_snapshots ORDER BY date
+        """).fetchall()]
+        if len(rows) < 3:
+            conn.close()
+            return
+
+        fixed = 0
+        for field in ("btc_total_krw", "total_krw"):
+            values = [r[field] or 0 for r in rows]
+            nonzero = sorted(v for v in values if v > 0)
+            if not nonzero:
+                continue
+            med = nonzero[len(nonzero) // 2]
+            for i, row in enumerate(rows):
+                v = values[i]
+                if not v or not (v / med > 100 or v / med < 0.01):
+                    continue
+                corrected = _interpolate(values, i, threshold=50)
+                if not corrected:
+                    continue
+                if field == "btc_total_krw":
+                    new_total = (row["total_krw"] or 0) - v + corrected
+                    query(conn, """
+                        UPDATE portfolio_snapshots
+                        SET btc_total_krw = %s, total_krw = %s WHERE id = %s
+                    """, (corrected, new_total, row["id"]))
+                    # update in-place so total_krw pass sees the fix
+                    rows[i]["btc_total_krw"] = corrected
+                    rows[i]["total_krw"]     = new_total
+                else:
+                    query(conn, "UPDATE portfolio_snapshots SET total_krw = %s WHERE id = %s",
+                          (corrected, row["id"]))
+                fixed += 1
+                logging.warning(f"clean_snapshot_outliers: fixed {field} on {row['date']}: "
+                                f"{v:.0f} → {corrected:.0f}")
+        conn.commit()
+        conn.close()
+        if fixed:
+            logging.warning(f"clean_snapshot_outliers: corrected {fixed} row(s) at startup")
+    except Exception as e:
+        logging.error(f"clean_snapshot_outliers failed: {e}")
+
+
 init_db()
+clean_snapshot_outliers()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
