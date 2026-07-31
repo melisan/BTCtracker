@@ -544,14 +544,20 @@ const fmtShort = v => {
 };
 
 function forwardFill(rows) {
-  const FIELDS = ["btc_total_krw","eth_total_krw","us_total_krw","korean_total_krw","krw_total_krw","total_krw"];
+  const SUB = ["btc_total_krw","eth_total_krw","us_total_krw","korean_total_krw","krw_total_krw"];
   const last = {};
   return rows.map(r => {
     const out = { ...r };
-    FIELDS.forEach(f => {
-      if (out[f]) last[f] = out[f];
-      else if (last[f]) out[f] = last[f];
+    let filled = false;
+    SUB.forEach(f => {
+      if (out[f]) { last[f] = out[f]; }
+      else if (last[f]) { out[f] = last[f]; filled = true; }
     });
+    // Recompute total from components if any sub-value was missing in the snapshot
+    if (filled || !out.total_krw) {
+      const recomputed = SUB.reduce((s, f) => s + (out[f] || 0), 0);
+      if (recomputed > (out.total_krw || 0)) out.total_krw = recomputed;
+    }
     return out;
   });
 }
