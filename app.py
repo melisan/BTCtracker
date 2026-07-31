@@ -631,7 +631,7 @@ def api_diagnose_anomalies():
             continue
         window.sort()
         median = window[len(window)//2]
-        if median and (p / median > 2.5 or p / median < 0.4):
+        if median and (p / median > 1.5 or p / median < 0.667):
             ratio = p / median
             kind  = "price_10x" if 8 < ratio < 12 else \
                     "price_100x" if 80 < ratio < 120 else \
@@ -670,19 +670,19 @@ def api_fix_anomalies():
             continue
         window.sort()
         median = window[len(window)//2]
-        if not median or not (p / median > 2.5 or p / median < 0.4):
+        if not median or not (p / median > 1.5 or p / median < 0.667):
             continue
 
         # Find nearest valid (non-anomalous) neighbors for interpolation
         left_p = left_i = right_p = right_i = None
         for j in range(i-1, max(-1, i-20), -1):
             nb = prices[j]
-            if nb and 0.4 < nb/median < 2.5:
+            if nb and 0.667 < nb/median < 1.5:
                 left_p, left_i = nb, j
                 break
         for j in range(i+1, min(len(prices), i+20)):
             nb = prices[j]
-            if nb and 0.4 < nb/median < 2.5:
+            if nb and 0.667 < nb/median < 1.5:
                 right_p, right_i = nb, j
                 break
 
@@ -715,6 +715,70 @@ def api_fix_anomalies():
     conn.commit()
     conn.close()
     return jsonify({"fixed": len(fixed), "details": fixed})
+
+
+@app.route("/api/admin/snapshots")
+def api_admin_snapshots():
+    """Return raw snapshot rows around a date for manual inspection."""
+    around = request.args.get("around", "").strip()
+    days   = min(int(request.args.get("days", 14)), 60)
+    conn   = get_db()
+    try:
+        if around:
+            center = datetime.strptime(around, "%Y-%m-%d")
+            start  = (center - timedelta(days=days)).strftime("%Y-%m-%d")
+            end    = (center + timedelta(days=days)).strftime("%Y-%m-%d")
+            rows   = [dict(r) for r in query(conn, """
+                SELECT id, date, btc_price_krw, btc_total_krw,
+                       eth_price_krw, eth_total_krw,
+                       us_total_krw, korean_total_krw, krw_total_krw, total_krw
+                FROM portfolio_snapshots
+                WHERE date >= %s AND date <= %s ORDER BY date
+            """, (start, end)).fetchall()]
+        else:
+            rows = [dict(r) for r in query(conn, """
+                SELECT id, date, btc_price_krw, btc_total_krw,
+                       eth_price_krw, eth_total_krw,
+                       us_total_krw, korean_total_krw, krw_total_krw, total_krw
+                FROM portfolio_snapshots ORDER BY date DESC LIMIT 30
+            """).fetchall()]
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 400
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/admin/patch-snapshot", methods=["POST"])
+def api_patch_snapshot():
+    """Manually patch any column of a snapshot row by date. Requires admin password."""
+    data     = request.get_json() or {}
+    password = data.get("password", "")
+    if password != ADMIN_PASSWORD:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    date = (data.get("date") or "").strip()
+    if not date:
+        return jsonify({"error": "date is required"}), 400
+
+    allowed = {"btc_price_krw", "btc_total_krw", "eth_price_krw", "eth_total_krw",
+               "us_total_krw", "korean_total_krw", "krw_total_krw", "total_krw"}
+    updates = {k: float(v) for k, v in data.items() if k in allowed and v is not None}
+    if not updates:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    conn = get_db()
+    cur  = query(conn, "SELECT id FROM portfolio_snapshots WHERE date = %s", (date,))
+    if not cur.fetchone():
+        conn.close()
+        return jsonify({"error": f"No snapshot for {date}"}), 404
+
+    set_clause = ", ".join(f"{k} = %s" for k in updates)
+    values     = list(updates.values()) + [date]
+    query(conn, f"UPDATE portfolio_snapshots SET {set_clause} WHERE date = %s", values)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "date": date, "updated": list(updates.keys())})
 
 
 # ── Notes (per-tab journal) ───────────────────────────────────

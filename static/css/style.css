@@ -434,6 +434,17 @@ canvas { width: 100% !important; }
 .hist-sub   { color: var(--text-muted); font-size: 0.8rem; }
 .history-table th, .history-table td { white-space: nowrap; }
 
+/* ── Data Diagnostics ── */
+.diag-toggle-row { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0; }
+.diag-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+.diag-table th, .diag-table td { white-space: nowrap; font-size: 0.78rem; padding: 5px 8px; }
+.diag-anomaly { background: rgba(224,123,106,0.18) !important; }
+.diag-edit-btn { background: none; border: 1px solid var(--border-sub); border-radius: 4px;
+  color: var(--gold); font-size: 0.72rem; padding: 2px 6px; cursor: pointer; }
+.diag-edit-btn:hover { background: rgba(232,184,75,0.1); }
+.diag-patch-label { font-size: 0.72rem; display: flex; flex-direction: column; gap: 1px; }
+.diag-patch-label input { width: 120px; font-size: 0.78rem; }
+
 /* ── Retirement Tab ── */
 .ret-summary-grid {
   display: grid; grid-template-columns: repeat(4, 1fr);

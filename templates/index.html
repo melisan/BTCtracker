@@ -317,6 +317,49 @@
       </div>
     </div>
 
+    <!-- Data Diagnostics card -->
+    <div class="card" id="diagnostics-card">
+      <div class="card-header diag-toggle-row" id="diagnostics-toggle" style="cursor:pointer;user-select:none">
+        <h2 style="margin:0;font-size:1rem">🔬 Data Diagnostics</h2>
+        <span id="diagnostics-arrow" style="font-size:0.85rem;opacity:0.6">▼</span>
+      </div>
+      <div id="diagnostics-body">
+        <div class="diag-controls">
+          <label style="font-size:0.82rem;opacity:0.7">Around date:</label>
+          <input id="diag-date" type="date" value="2026-06-19" style="width:140px" />
+          <input id="diag-days" type="number" value="14" min="1" max="60" style="width:52px" title="Window (days each side)" />
+          <button id="diag-load-btn" class="btn-secondary" style="font-size:0.78rem">Load</button>
+        </div>
+        <div id="diag-status" style="font-size:0.78rem;opacity:0.6;margin-bottom:6px"></div>
+        <div style="overflow-x:auto">
+          <table class="table diag-table" id="diag-table" style="display:none">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>BTC Price (₩)</th>
+                <th>BTC Total (₩)</th>
+                <th>ETH Total (₩)</th>
+                <th>US Total (₩)</th>
+                <th>KR Total (₩)</th>
+                <th>KRW (₩)</th>
+                <th>Total (₩)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="diag-tbody"></tbody>
+          </table>
+        </div>
+        <!-- inline patch form -->
+        <div id="diag-patch-form" class="add-form hidden" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+          <strong id="diag-patch-date-label" style="width:100%;font-size:0.85rem"></strong>
+          <div id="diag-patch-fields" style="display:flex;flex-wrap:wrap;gap:6px;width:100%"></div>
+          <input id="diag-patch-pw" type="password" placeholder="Admin password" style="width:150px" />
+          <button id="diag-patch-save" class="btn-primary" style="font-size:0.8rem">Save</button>
+          <button id="diag-patch-cancel" class="btn-secondary" style="font-size:0.8rem">Cancel</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── RETIREMENT TAB ── -->

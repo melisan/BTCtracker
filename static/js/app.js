@@ -1334,6 +1334,184 @@ async function deleteNote(nid, tabId) {
   await fetchTabNotes(tabId);
 }
 
+// ── Data Diagnostics (manual snapshot inspection + patch) ────
+let diagRows     = [];
+let diagPatchRow = null;
+
+document.getElementById("diagnostics-toggle")?.addEventListener("click", () => {
+  const body  = document.getElementById("diagnostics-body");
+  const arrow = document.getElementById("diagnostics-arrow");
+  if (!body) return;
+  const hidden = body.style.display === "none";
+  body.style.display = hidden ? "" : "none";
+  if (arrow) arrow.textContent = hidden ? "▼" : "▶";
+});
+
+document.getElementById("diag-load-btn")?.addEventListener("click", () => {
+  const date = document.getElementById("diag-date")?.value || "2026-06-19";
+  const days = parseInt(document.getElementById("diag-days")?.value || "14");
+  loadDiagnostics(date, days);
+});
+
+document.getElementById("diag-patch-cancel")?.addEventListener("click", () => {
+  document.getElementById("diag-patch-form")?.classList.add("hidden");
+  diagPatchRow = null;
+});
+
+document.getElementById("diag-patch-save")?.addEventListener("click", saveDiagPatch);
+
+async function loadDiagnostics(date, days) {
+  const status = document.getElementById("diag-status");
+  if (status) status.textContent = "Loading…";
+  try {
+    const res = await fetch(`/api/admin/snapshots?around=${encodeURIComponent(date)}&days=${days}`);
+    diagRows  = await res.json();
+    if (status) status.textContent = `${diagRows.length} row(s) found around ${date}`;
+    renderDiagTable();
+  } catch (err) {
+    if (status) status.textContent = "Error: " + err.message;
+  }
+}
+
+function detectDiagAnomaly(rows, i, field) {
+  const vals = rows.map(r => r[field] || 0).filter(v => v > 0);
+  const v    = rows[i][field] || 0;
+  if (!v || vals.length < 3) return false;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const med    = sorted[Math.floor(sorted.length / 2)];
+  return med > 0 && (v / med > 1.5 || v / med < 0.667);
+}
+
+function renderDiagTable() {
+  const tbody = document.getElementById("diag-tbody");
+  const table = document.getElementById("diag-table");
+  if (!tbody || !table) return;
+  table.style.display = diagRows.length ? "" : "none";
+  tbody.innerHTML = "";
+
+  const FIELDS = [
+    ["btc_price_krw",    "BTC Price"],
+    ["btc_total_krw",    "BTC Total"],
+    ["eth_total_krw",    "ETH Total"],
+    ["us_total_krw",     "US Total"],
+    ["korean_total_krw", "KR Total"],
+    ["krw_total_krw",    "KRW"],
+    ["total_krw",        "Total"],
+  ];
+
+  diagRows.forEach((row, i) => {
+    const anomalyCols = FIELDS.filter(([f]) => detectDiagAnomaly(diagRows, i, f)).map(([f]) => f);
+    const tr = document.createElement("tr");
+    if (anomalyCols.length) tr.classList.add("diag-anomaly");
+
+    const dateTd = document.createElement("td");
+    dateTd.textContent = row.date;
+    dateTd.style.fontWeight = "600";
+    tr.appendChild(dateTd);
+
+    FIELDS.forEach(([field]) => {
+      const td  = document.createElement("td");
+      const val = row[field];
+      td.textContent = val != null ? fmtShort(val) : "—";
+      if (anomalyCols.includes(field)) {
+        td.style.color  = "var(--coral)";
+        td.style.fontWeight = "700";
+        td.title = `Anomaly detected (value: ${Math.round(val).toLocaleString()})`;
+      }
+      tr.appendChild(td);
+    });
+
+    const actTd = document.createElement("td");
+    const editBtn = document.createElement("button");
+    editBtn.className   = "diag-edit-btn";
+    editBtn.textContent = "✎ Edit";
+    editBtn.addEventListener("click", () => openDiagPatch(row));
+    actTd.appendChild(editBtn);
+    tr.appendChild(actTd);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function openDiagPatch(row) {
+  diagPatchRow = row;
+  const form   = document.getElementById("diag-patch-form");
+  const label  = document.getElementById("diag-patch-date-label");
+  const fields = document.getElementById("diag-patch-fields");
+  if (!form || !fields) return;
+
+  if (label) label.textContent = `Editing ${row.date}`;
+  fields.innerHTML = "";
+
+  const PATCH_FIELDS = [
+    ["btc_price_krw",    "BTC Price (₩)"],
+    ["btc_total_krw",    "BTC Total (₩)"],
+    ["eth_total_krw",    "ETH Total (₩)"],
+    ["us_total_krw",     "US Total (₩)"],
+    ["korean_total_krw", "KR Total (₩)"],
+    ["krw_total_krw",    "KRW (₩)"],
+    ["total_krw",        "Grand Total (₩)"],
+  ];
+
+  PATCH_FIELDS.forEach(([field, lbl]) => {
+    const wrap = document.createElement("label");
+    wrap.className = "diag-patch-label";
+    wrap.innerHTML = `<span style="font-size:0.7rem;opacity:0.7">${lbl}</span>`;
+    const inp = document.createElement("input");
+    inp.type  = "number";
+    inp.id    = `diag-field-${field}`;
+    inp.value = row[field] != null ? Math.round(row[field]) : "";
+    inp.placeholder = lbl;
+    wrap.appendChild(inp);
+    fields.appendChild(wrap);
+  });
+
+  form.classList.remove("hidden");
+  form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function saveDiagPatch() {
+  if (!diagPatchRow) return;
+  const pw = document.getElementById("diag-patch-pw")?.value || "";
+  if (!pw) { alert("Enter admin password first."); return; }
+
+  const PATCH_FIELDS = ["btc_price_krw","btc_total_krw","eth_total_krw",
+                        "us_total_krw","korean_total_krw","krw_total_krw","total_krw"];
+  const payload = { date: diagPatchRow.date, password: pw };
+  PATCH_FIELDS.forEach(f => {
+    const inp = document.getElementById(`diag-field-${f}`);
+    if (inp && inp.value !== "") payload[f] = parseFloat(inp.value);
+  });
+
+  const saveBtn = document.getElementById("diag-patch-save");
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving…"; }
+
+  try {
+    const res  = await fetch("/api/admin/patch-snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert("Error: " + (data.error || res.status)); return; }
+    alert(`Saved! Updated fields: ${data.updated.join(", ")}`);
+    document.getElementById("diag-patch-form")?.classList.add("hidden");
+    diagPatchRow = null;
+    // Reload diagnostic view and refresh history
+    const date = document.getElementById("diag-date")?.value || "2026-06-19";
+    const days = parseInt(document.getElementById("diag-days")?.value || "14");
+    await loadDiagnostics(date, days);
+    weeklyHistData = [];
+    historyData    = [];
+    await Promise.all([fetchHistory(), fetchWeeklyHistory()]);
+    renderActiveTab();
+  } catch (err) {
+    alert("Error: " + err.message);
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
+  }
+}
+
 // ── Anomaly fix (History tab admin tool) ─────────────────────
 async function runAnomalyFix() {
   const btn = document.getElementById("fix-anomaly-btn");
