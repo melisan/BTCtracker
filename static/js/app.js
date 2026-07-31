@@ -497,8 +497,7 @@ async function fetchHistory() {
   try {
     const res = await fetch(`/api/portfolio/history?range=${activeRange}`);
     const raw = await res.json();
-    const filled = forwardFill(raw);
-    historyData = filled.length > 1 ? filled.slice(0, -1) : filled;
+    historyData = raw.length > 1 ? raw.slice(0, -1) : raw;
     renderLineChart(historyData);
   } catch (err) { console.error("History fetch failed:", err); }
 }
@@ -543,29 +542,37 @@ const fmtShort = v => {
   return (neg ? "-" : "") + s;
 };
 
-function forwardFill(rows) {
-  const SUB = ["btc_total_krw","eth_total_krw","us_total_krw","korean_total_krw","krw_total_krw"];
-  const last = {};
-  return rows.map(r => {
-    const out = { ...r };
-    let filled = false;
-    SUB.forEach(f => {
-      if (out[f]) { last[f] = out[f]; }
-      else if (last[f]) { out[f] = last[f]; filled = true; }
-    });
-    // Recompute total from components if any sub-value was missing in the snapshot
-    if (filled || !out.total_krw) {
-      const recomputed = SUB.reduce((s, f) => s + (out[f] || 0), 0);
-      if (recomputed > (out.total_krw || 0)) out.total_krw = recomputed;
-    }
-    return out;
-  });
+function isoWeekKey(dateStr) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  const wk   = 1 + Math.round(((d - jan4) / 86400000 - 3 + (jan4.getDay() + 6) % 7) / 7);
+  return `${d.getFullYear()}-W${String(wk).padStart(2, "0")}`;
 }
 
 async function fetchWeeklyHistory() {
   try {
     const res = await fetch("/api/portfolio/history/weekly");
-    weeklyHistData = forwardFill(await res.json());
+    const raw = await res.json();
+
+    // Drop any entry from the current ISO week — we'll replace it with live data
+    const thisWeek = isoWeekKey(new Date().toISOString().slice(0, 10));
+    const past = raw.filter(r => isoWeekKey(r.date) !== thisWeek);
+
+    // Append today's live breakdown as the final "current" entry
+    const bd    = computeBreakdown();
+    const today = new Date().toISOString().slice(0, 10);
+    const live  = {
+      date:             today,
+      total_krw:        bd.total,
+      btc_total_krw:    bd.btc,
+      eth_total_krw:    bd.eth,
+      us_total_krw:     bd.us,
+      korean_total_krw: bd.korean,
+      krw_total_krw:    bd.krw,
+    };
+
+    weeklyHistData = [...past, live];
     if (activeTab === "history") renderHistoryTab();
   } catch (err) { console.error("Weekly history fetch failed:", err); }
 }
