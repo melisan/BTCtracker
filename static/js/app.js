@@ -497,7 +497,8 @@ async function fetchHistory() {
   try {
     const res = await fetch(`/api/portfolio/history?range=${activeRange}`);
     const raw = await res.json();
-    historyData = raw.length > 1 ? raw.slice(0, -1) : raw;
+    const filled = forwardFill(raw);
+    historyData = filled.length > 1 ? filled.slice(0, -1) : filled;
     renderLineChart(historyData);
   } catch (err) { console.error("History fetch failed:", err); }
 }
@@ -542,10 +543,23 @@ const fmtShort = v => {
   return (neg ? "-" : "") + s;
 };
 
+function forwardFill(rows) {
+  const FIELDS = ["btc_total_krw","eth_total_krw","us_total_krw","korean_total_krw","krw_total_krw","total_krw"];
+  const last = {};
+  return rows.map(r => {
+    const out = { ...r };
+    FIELDS.forEach(f => {
+      if (out[f]) last[f] = out[f];
+      else if (last[f]) out[f] = last[f];
+    });
+    return out;
+  });
+}
+
 async function fetchWeeklyHistory() {
   try {
     const res = await fetch("/api/portfolio/history/weekly");
-    weeklyHistData = await res.json();
+    weeklyHistData = forwardFill(await res.json());
     if (activeTab === "history") renderHistoryTab();
   } catch (err) { console.error("Weekly history fetch failed:", err); }
 }
@@ -619,11 +633,11 @@ function renderHistoryTable(data, S) {
       <td class="hist-total">${fmtKRW.format(total)}</td>
       <td class="${cls}">${sign}${fmtShort(gain)}</td>
       <td class="${cls}">${sign}${pct.toFixed(1)}%</td>
-      <td class="hist-sub">${r.btc_total_krw    ? fmtShort(r.btc_total_krw)    : "—"}</td>
-      <td class="hist-sub">${r.eth_total_krw    ? fmtShort(r.eth_total_krw)    : "—"}</td>
-      <td class="hist-sub">${r.us_total_krw     ? fmtShort(r.us_total_krw)     : "—"}</td>
-      <td class="hist-sub">${r.korean_total_krw ? fmtShort(r.korean_total_krw) : "—"}</td>
-      <td class="hist-sub">${r.krw_total_krw    ? fmtShort(r.krw_total_krw)    : "—"}</td>
+      <td class="hist-sub">${fmtShort(r.btc_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.eth_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.us_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.korean_total_krw)}</td>
+      <td class="hist-sub">${fmtShort(r.krw_total_krw)}</td>
     </tr>`;
   }).join("");
 }
