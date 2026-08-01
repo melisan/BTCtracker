@@ -548,6 +548,8 @@ canvas { width: 100% !important; }
 }
 .scard:hover { transform: translateY(-2px); box-shadow: 0 4px 18px rgba(0,0,0,0.5); }
 .scard-total:hover { animation: faithGlow 2.4s ease-in-out infinite; }
+.scard-nav { cursor: pointer; }
+.scard-nav:hover::after { content: "→"; position: absolute; bottom: 0.5rem; right: 0.7rem; font-size: 0.75rem; opacity: 0.4; }
 
 /* ── Footer ── */
 .app-footer {

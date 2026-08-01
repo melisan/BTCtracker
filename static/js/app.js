@@ -270,6 +270,9 @@ function switchTab(tab) {
 document.querySelectorAll(".tab-btn").forEach(btn =>
   btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
+document.querySelectorAll(".scard-nav").forEach(card =>
+  card.addEventListener("click", () => switchTab(card.dataset.nav)));
+
 // ── Auth Modal ────────────────────────────────────────────────
 function showAuthModal(onSuccess) {
   const modal = document.getElementById("auth-modal");
