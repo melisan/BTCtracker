@@ -342,8 +342,7 @@ function renderActiveTab() {
 // ── Summary Cards ─────────────────────────────────────────────
 function updateSummaryCards(bd) {
   document.getElementById("sum-total").textContent  = fmtKRW.format(bd.total);
-  document.getElementById("sum-btc").textContent    = fmtKRW.format(bd.btc);
-  document.getElementById("sum-eth").textContent    = fmtKRW.format(bd.eth);
+  document.getElementById("sum-crypto").textContent = fmtKRW.format(bd.btc + bd.eth);
   document.getElementById("sum-us").textContent     = fmtKRW.format(bd.us);
   document.getElementById("sum-korean").textContent = fmtKRW.format(bd.korean);
   document.getElementById("sum-krw").textContent    = fmtKRW.format(bd.krw);
