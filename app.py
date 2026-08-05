@@ -604,6 +604,23 @@ def api_backfill():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/holdings/krw-history")
+def api_krw_history():
+    conn = get_db()
+    cur  = query(conn, """
+        SELECT id, label, old_amount, new_amount, total_krw, changed_at
+        FROM holding_logs
+        WHERE asset_type = 'KRW' AND new_amount > 0
+        ORDER BY changed_at DESC LIMIT 100
+    """)
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    for r in rows:
+        if isinstance(r.get("changed_at"), datetime):
+            r["changed_at"] = r["changed_at"].isoformat()
+    return jsonify(rows)
+
+
 @app.route("/api/logs")
 def api_logs():
     conn = get_db()

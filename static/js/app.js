@@ -921,12 +921,90 @@ function renderKRWTab() {
   } else {
     tbody.innerHTML = kH.map(h => {
       total += h.amount;
-      const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
-      return `<tr>${editRow(`<td>${escHtml(h.label)}</td><td ${amtAttrs}>${fmtKRW.format(h.amount)}</td>`, h.id)}`;
+      const updateBtn = editMode
+        ? `<button class="krw-update-btn btn-secondary" data-id="${h.id}" data-amount="${h.amount}" data-label="${escHtml(h.label)}" style="font-size:0.72rem;padding:2px 8px">Update</button>`
+        : "";
+      const delBtn = editMode
+        ? `<button class="btn-del del-btn" data-id="${h.id}" data-label="${escHtml(h.label)}" style="font-size:0.72rem;padding:2px 6px">✕</button>`
+        : "";
+      return `<tr>
+        <td>${escHtml(h.label)}</td>
+        <td style="font-weight:600">${fmtKRW.format(h.amount)}</td>
+        <td class="del-col" style="display:flex;gap:4px">${updateBtn}${delBtn}</td>
+      </tr>`;
     }).join("");
-    wireEditRows(tbody);
+
+    // Wire Update buttons → inline form per row
+    tbody.querySelectorAll(".krw-update-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const hid    = +btn.dataset.id;
+        const label  = btn.dataset.label;
+        const curAmt = +btn.dataset.amount;
+        const existing = document.getElementById(`krw-inline-${hid}`);
+        if (existing) { existing.remove(); return; }
+        const tr = btn.closest("tr");
+        const formRow = document.createElement("tr");
+        formRow.id = `krw-inline-${hid}`;
+        formRow.innerHTML = `
+          <td colspan="3" style="padding:6px 0">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span style="font-size:0.78rem;opacity:0.6">${escHtml(label)}</span>
+              <input id="krw-upd-inp-${hid}" type="number" value="${curAmt}" step="any" min="0"
+                style="width:160px;font-size:0.85rem" />
+              <button class="btn-primary" id="krw-upd-save-${hid}" style="font-size:0.75rem;padding:3px 10px">Save</button>
+              <button class="btn-secondary" id="krw-upd-cancel-${hid}" style="font-size:0.75rem;padding:3px 10px">Cancel</button>
+            </div>
+          </td>`;
+        tr.after(formRow);
+        const inp = document.getElementById(`krw-upd-inp-${hid}`);
+        inp?.focus(); inp?.select();
+
+        document.getElementById(`krw-upd-cancel-${hid}`)?.addEventListener("click", () => formRow.remove());
+        document.getElementById(`krw-upd-save-${hid}`)?.addEventListener("click", async () => {
+          const newAmt = parseFloat(inp?.value);
+          if (isNaN(newAmt) || newAmt < 0) return;
+          await updateHolding(hid, newAmt);
+          formRow.remove();
+          renderKRWHistory();
+        });
+      });
+    });
+
+    // Wire delete buttons
+    tbody.querySelectorAll(".del-btn").forEach(btn => {
+      btn.addEventListener("click", () => deleteHolding(+btn.dataset.id, btn.dataset.label));
+    });
   }
   document.getElementById("krw-subtotal").textContent = fmtKRW.format(total);
+  renderKRWHistory();
+}
+
+async function renderKRWHistory() {
+  const tbody = document.getElementById("krw-history-tbody");
+  if (!tbody) return;
+  try {
+    const res  = await fetch("/api/holdings/krw-history");
+    const rows = await res.json();
+    if (!rows.length) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No history yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const dt     = new Date(r.changed_at);
+      const ds     = dt.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year:"numeric", month:"short", day:"numeric" })
+                   + " " + dt.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+      const change = (r.new_amount || 0) - (r.old_amount || 0);
+      const cls    = change >= 0 ? "hist-pos" : "hist-neg";
+      const sign   = change >= 0 ? "+" : "";
+      return `<tr>
+        <td style="font-size:0.78rem;white-space:nowrap">${ds}</td>
+        <td style="font-size:0.82rem">${escHtml(r.label)}</td>
+        <td style="font-size:0.82rem;opacity:0.6">${fmtShort(r.old_amount || 0)}</td>
+        <td style="font-size:0.82rem;font-weight:600">${fmtShort(r.new_amount || 0)}</td>
+        <td class="${cls}" style="font-size:0.82rem">${sign}${fmtShort(change)}</td>
+      </tr>`;
+    }).join("");
+  } catch (e) { console.error(e); }
 }
 
 // ── Retirement Calculation ────────────────────────────────────

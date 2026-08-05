@@ -262,6 +262,28 @@
         <button id="krw-cancel-btn" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
       </div>
     </div>
+
+    <!-- KRW Balance History -->
+    <div class="card" id="krw-history-card">
+      <h2 style="font-size:0.95rem;margin-bottom:0.75rem" data-i18n="h2_krw_history">Balance History</h2>
+      <div style="overflow-x:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="th_date">Date</th>
+              <th data-i18n="th_label">Account</th>
+              <th>Previous</th>
+              <th>Updated</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+          <tbody id="krw-history-tbody">
+            <tr class="empty-row"><td colspan="5">No history yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── HISTORY TAB ── -->
