@@ -105,8 +105,12 @@ def init_db():
             id         SERIAL PRIMARY KEY,
             tab        TEXT NOT NULL,
             content    TEXT NOT NULL,
+            pinned     BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT NOW()
         )
+    """)
+    cur.execute("""
+        ALTER TABLE tab_notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE
     """)
     conn.commit()
     cur.close()
@@ -851,8 +855,9 @@ def api_get_notes():
     tab  = request.args.get("tab", "").strip()
     conn = get_db()
     cur  = query(conn, """
-        SELECT id, tab, content, created_at
-        FROM tab_notes WHERE tab = %s ORDER BY created_at DESC
+        SELECT id, tab, content, pinned, created_at
+        FROM tab_notes WHERE tab = %s
+        ORDER BY pinned DESC, created_at DESC
     """, (tab,))
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
@@ -875,6 +880,21 @@ def api_add_note():
     conn.commit()
     conn.close()
     return jsonify({"id": nid}), 201
+
+
+@app.route("/api/notes/<int:nid>/pin", methods=["POST"])
+def api_toggle_pin(nid):
+    conn = get_db()
+    cur  = query(conn, "SELECT pinned FROM tab_notes WHERE id = %s", (nid,))
+    row  = cur.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    new_pinned = not row["pinned"]
+    query(conn, "UPDATE tab_notes SET pinned = %s WHERE id = %s", (new_pinned, nid))
+    conn.commit()
+    conn.close()
+    return jsonify({"pinned": new_pinned})
 
 
 @app.route("/api/notes/<int:nid>", methods=["PUT"])

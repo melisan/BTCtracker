@@ -594,6 +594,8 @@ canvas { width: 100% !important; }
 .btn-del:hover { color: var(--coral) !important; border-color: var(--coral) !important; }
 .note-content { font-size: 0.82rem; color: var(--text); line-height: 1.55;
                 white-space: pre-wrap; word-break: break-word; }
+.note-pinned { border-left: 2px solid var(--gold); background: rgba(232,184,75,0.06); }
+.note-pin-active { color: var(--gold) !important; border-color: rgba(232,184,75,0.4) !important; }
 .note-edit-form { margin-top: 0.4rem; }
 .note-edit-inp { width: 100%; background: var(--bg); border: 1px solid var(--border);
   border-radius: 6px; color: var(--text); font-size: 0.82rem; padding: 0.4rem 0.6rem;

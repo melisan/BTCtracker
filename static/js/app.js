@@ -1348,10 +1348,11 @@ function renderTabNotes(tabId) {
     const dt  = new Date(n.created_at);
     const ts  = dt.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year:"numeric", month:"short", day:"numeric" })
               + " " + dt.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
-    return `<div class="note-item" data-note-id="${n.id}">
+    return `<div class="note-item${n.pinned ? " note-pinned" : ""}" data-note-id="${n.id}">
       <div class="note-meta">
-        <span class="note-ts">${ts}</span>
+        <span class="note-ts">${n.pinned ? "📌 " : ""}${ts}</span>
         <div class="note-actions">
+          <button class="note-pin btn-note-act${n.pinned ? " note-pin-active" : ""}" data-id="${n.id}" data-tab="${tabId}" title="${n.pinned ? "Unpin" : "Pin"}">${n.pinned ? "📌" : "📍"}</button>
           <button class="note-edit btn-note-act" data-id="${n.id}" data-tab="${tabId}" title="Edit">✎</button>
           <button class="note-del  btn-note-act btn-del" data-id="${n.id}" data-tab="${tabId}" title="Delete">✕</button>
         </div>
@@ -1366,6 +1367,20 @@ function renderTabNotes(tabId) {
       </div>
     </div>`;
   }).join("");
+
+  list.querySelectorAll(".note-pin").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const nid = +btn.dataset.id, tab = btn.dataset.tab;
+      const doPin = async () => {
+        btn.disabled = true;
+        await fetch(`/api/notes/${nid}/pin`, { method: "POST" });
+        delete notesCache[tab];
+        await fetchTabNotes(tab);
+      };
+      if (!isAuthenticated) { showAuthModal(async () => { isAuthenticated = true; await doPin(); }); return; }
+      await doPin();
+    });
+  });
 
   list.querySelectorAll(".note-edit").forEach(btn => {
     btn.addEventListener("click", () => {
