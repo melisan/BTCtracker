@@ -990,9 +990,10 @@ async function renderKRWHistory() {
       return;
     }
     tbody.innerHTML = rows.map(r => {
-      const dt     = new Date(r.changed_at);
-      const ds     = dt.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", { year:"numeric", month:"short", day:"numeric" })
-                   + " " + dt.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+      const dt = new Date(r.changed_at);
+      const ds = String(dt.getFullYear()).slice(2)
+               + "/" + String(dt.getMonth() + 1).padStart(2, "0")
+               + "/" + String(dt.getDate()).padStart(2, "0");
       const change = (r.new_amount || 0) - (r.old_amount || 0);
       const cls    = change >= 0 ? "hist-pos" : "hist-neg";
       const sign   = change >= 0 ? "+" : "";
