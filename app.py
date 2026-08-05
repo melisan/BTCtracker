@@ -877,6 +877,19 @@ def api_add_note():
     return jsonify({"id": nid}), 201
 
 
+@app.route("/api/notes/<int:nid>", methods=["PUT"])
+def api_edit_note(nid):
+    data    = request.get_json() or {}
+    content = (data.get("content") or "").strip()
+    if not content:
+        return jsonify({"error": "content required"}), 400
+    conn = get_db()
+    query(conn, "UPDATE tab_notes SET content = %s WHERE id = %s", (content, nid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/notes/<int:nid>", methods=["DELETE"])
 def api_delete_note(nid):
     conn = get_db()

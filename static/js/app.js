@@ -1351,11 +1351,58 @@ function renderTabNotes(tabId) {
     return `<div class="note-item" data-note-id="${n.id}">
       <div class="note-meta">
         <span class="note-ts">${ts}</span>
-        <button class="note-del btn-del" data-id="${n.id}" data-tab="${tabId}" title="Delete">✕</button>
+        <div class="note-actions">
+          <button class="note-edit btn-note-act" data-id="${n.id}" data-tab="${tabId}" title="Edit">✎</button>
+          <button class="note-del  btn-note-act btn-del" data-id="${n.id}" data-tab="${tabId}" title="Delete">✕</button>
+        </div>
       </div>
-      <div class="note-content">${escHtml(n.content)}</div>
+      <div class="note-content" id="note-content-${n.id}">${escHtml(n.content)}</div>
+      <div class="note-edit-form hidden" id="note-edit-form-${n.id}">
+        <textarea class="note-edit-inp" id="note-edit-inp-${n.id}" rows="3">${escHtml(n.content)}</textarea>
+        <div class="note-edit-btns">
+          <button class="note-save-edit btn-primary" data-id="${n.id}" data-tab="${tabId}" style="font-size:0.75rem;padding:3px 10px">Save</button>
+          <button class="note-cancel-edit btn-secondary" data-id="${n.id}" style="font-size:0.75rem;padding:3px 10px">Cancel</button>
+        </div>
+      </div>
     </div>`;
   }).join("");
+
+  list.querySelectorAll(".note-edit").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const nid = +btn.dataset.id;
+      const doEdit = () => {
+        document.getElementById(`note-content-${nid}`)?.classList.add("hidden");
+        document.getElementById(`note-edit-form-${nid}`)?.classList.remove("hidden");
+        document.getElementById(`note-edit-inp-${nid}`)?.focus();
+      };
+      if (!isAuthenticated) { showAuthModal(() => { isAuthenticated = true; doEdit(); }); return; }
+      doEdit();
+    });
+  });
+
+  list.querySelectorAll(".note-cancel-edit").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const nid = +btn.dataset.id;
+      document.getElementById(`note-content-${nid}`)?.classList.remove("hidden");
+      document.getElementById(`note-edit-form-${nid}`)?.classList.add("hidden");
+    });
+  });
+
+  list.querySelectorAll(".note-save-edit").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const nid = +btn.dataset.id, tab = btn.dataset.tab;
+      const inp = document.getElementById(`note-edit-inp-${nid}`);
+      const content = inp?.value.trim();
+      if (!content) return;
+      btn.disabled = true; btn.textContent = "…";
+      await fetch(`/api/notes/${nid}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      delete notesCache[tab];
+      await fetchTabNotes(tab);
+    });
+  });
 
   list.querySelectorAll(".note-del").forEach(btn => {
     btn.addEventListener("click", async () => {

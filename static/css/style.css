@@ -586,9 +586,19 @@ canvas { width: 100% !important; }
 .note-meta { display: flex; align-items: center; justify-content: space-between;
              margin-bottom: 0.3rem; }
 .note-ts { font-size: 0.66rem; color: var(--text-muted); }
-.note-del { font-size: 0.72rem; padding: 0.1rem 0.35rem; }
+.note-actions { display: flex; gap: 4px; }
+.btn-note-act { background: none; border: 1px solid var(--border-sub); border-radius: 4px;
+  color: var(--text-muted); font-size: 0.72rem; padding: 1px 6px; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s; }
+.btn-note-act:hover { color: var(--text); border-color: var(--border); }
+.btn-del:hover { color: var(--coral) !important; border-color: var(--coral) !important; }
 .note-content { font-size: 0.82rem; color: var(--text); line-height: 1.55;
                 white-space: pre-wrap; word-break: break-word; }
+.note-edit-form { margin-top: 0.4rem; }
+.note-edit-inp { width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 0.82rem; padding: 0.4rem 0.6rem;
+  resize: vertical; font-family: inherit; line-height: 1.5; }
+.note-edit-btns { display: flex; gap: 6px; margin-top: 5px; }
 .notes-add-row { display: flex; gap: 0.5rem; align-items: flex-end; }
 .notes-input {
   flex: 1; background: var(--bg-inner); border: 1px solid var(--border-sub);
