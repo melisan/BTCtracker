@@ -986,7 +986,7 @@ async function renderKRWHistory() {
     const res  = await fetch("/api/holdings/krw-history");
     const rows = await res.json();
     if (!rows.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No history yet.</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No history yet.</td></tr>`;
       return;
     }
     tbody.innerHTML = rows.map(r => {
@@ -996,14 +996,64 @@ async function renderKRWHistory() {
       const change = (r.new_amount || 0) - (r.old_amount || 0);
       const cls    = change >= 0 ? "hist-pos" : "hist-neg";
       const sign   = change >= 0 ? "+" : "";
-      return `<tr>
+      return `<tr id="krw-hist-row-${r.id}">
         <td style="font-size:0.78rem;white-space:nowrap">${ds}</td>
         <td style="font-size:0.82rem">${escHtml(r.label)}</td>
         <td style="font-size:0.82rem;opacity:0.6">${fmtShort(r.old_amount || 0)}</td>
         <td style="font-size:0.82rem;font-weight:600">${fmtShort(r.new_amount || 0)}</td>
         <td class="${cls}" style="font-size:0.82rem">${sign}${fmtShort(change)}</td>
+        <td style="white-space:nowrap">
+          <button class="krw-hist-edit btn-note-act" data-id="${r.id}" data-old="${r.old_amount||0}" data-new="${r.new_amount||0}" style="font-size:0.7rem">✎</button>
+          <button class="krw-hist-del  btn-note-act btn-del" data-id="${r.id}" style="font-size:0.7rem;margin-left:3px">✕</button>
+        </td>
       </tr>`;
     }).join("");
+
+    tbody.querySelectorAll(".krw-hist-edit").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const lid = +btn.dataset.id;
+        if (document.getElementById(`krw-hist-form-${lid}`)) {
+          document.getElementById(`krw-hist-form-${lid}`)?.remove(); return;
+        }
+        const row = document.getElementById(`krw-hist-row-${lid}`);
+        const formRow = document.createElement("tr");
+        formRow.id = `krw-hist-form-${lid}`;
+        formRow.innerHTML = `<td colspan="6" style="padding:6px 0">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:0.72rem;opacity:0.7">Previous&nbsp;
+              <input id="krw-hist-old-${lid}" type="number" value="${btn.dataset.old}" style="width:120px;font-size:0.8rem" />
+            </label>
+            <label style="font-size:0.72rem;opacity:0.7">Updated&nbsp;
+              <input id="krw-hist-new-${lid}" type="number" value="${btn.dataset.new}" style="width:120px;font-size:0.8rem" />
+            </label>
+            <button class="btn-primary  krw-hist-save" data-id="${lid}" style="font-size:0.73rem;padding:3px 10px">Save</button>
+            <button class="btn-secondary krw-hist-cancel" data-id="${lid}" style="font-size:0.73rem;padding:3px 10px">Cancel</button>
+          </div>
+        </td>`;
+        row.after(formRow);
+
+        formRow.querySelector(".krw-hist-cancel").addEventListener("click", () => formRow.remove());
+        formRow.querySelector(".krw-hist-save").addEventListener("click", async () => {
+          const oldVal = parseFloat(document.getElementById(`krw-hist-old-${lid}`)?.value);
+          const newVal = parseFloat(document.getElementById(`krw-hist-new-${lid}`)?.value);
+          await fetch(`/api/holdings/krw-history/${lid}`, {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ old_amount: oldVal, new_amount: newVal }),
+          });
+          formRow.remove();
+          renderKRWHistory();
+        });
+      });
+    });
+
+    tbody.querySelectorAll(".krw-hist-del").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this history entry?")) return;
+        await fetch(`/api/holdings/krw-history/${+btn.dataset.id}`, { method: "DELETE" });
+        renderKRWHistory();
+      });
+    });
+
   } catch (e) { console.error(e); }
 }
 

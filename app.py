@@ -604,6 +604,31 @@ def api_backfill():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/holdings/krw-history/<int:lid>", methods=["PUT"])
+def api_krw_history_edit(lid):
+    data = request.get_json() or {}
+    allowed = {"old_amount", "new_amount"}
+    updates = {k: float(v) for k, v in data.items() if k in allowed and v is not None}
+    if not updates:
+        return jsonify({"error": "no valid fields"}), 400
+    conn = get_db()
+    set_clause = ", ".join(f"{k} = %s" for k in updates)
+    query(conn, f"UPDATE holding_logs SET {set_clause} WHERE id = %s AND asset_type = 'KRW'",
+          list(updates.values()) + [lid])
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/holdings/krw-history/<int:lid>", methods=["DELETE"])
+def api_krw_history_delete(lid):
+    conn = get_db()
+    query(conn, "DELETE FROM holding_logs WHERE id = %s AND asset_type = 'KRW'", (lid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/holdings/krw-history")
 def api_krw_history():
     conn = get_db()
