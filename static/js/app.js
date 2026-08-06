@@ -849,7 +849,8 @@ function renderUSTab() {
       const usd = stockData.prices?.[h.asset_type] || 0;
       const krw = h.amount * usd * usd_krw; total += krw;
       const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
-      return `<tr>${editRow(`<td>${escHtml(h.label)}</td><td ${amtAttrs}>${fmtNum(h.amount)}</td><td class="krw-muted">${usd ? fmtUSD.format(h.amount * usd) : "—"}</td><td>${fmtKRW.format(krw)}</td>`, h.id)}`;
+      const priceKrw = usd * usd_krw;
+      return `<tr>${editRow(`<td>${escHtml(h.label)}</td><td ${amtAttrs}>${fmtNum(h.amount)}</td><td class="krw-muted">${priceKrw ? fmtKRW.format(priceKrw) : "—"}</td><td class="krw-muted">${usd ? fmtUSD.format(h.amount * usd) : "—"}</td><td>${fmtKRW.format(krw)}</td>`, h.id)}`;
     }).join("");
     wireEditRows(tbody);
   }
@@ -873,7 +874,7 @@ function renderKoreanTab() {
       const p   = stockData.kospi_prices?.[h.asset_type] || 0;
       const krw = h.amount * p; total += krw;
       const amtAttrs = editMode ? `class="amount-cell" data-id="${h.id}" data-amount="${h.amount}"` : "";
-      return `<tr>${editRow(`<td>${escHtml(h.label)}</td><td ${amtAttrs}>${fmtNum(h.amount)}</td><td>${fmtKRW.format(krw)}</td>`, h.id)}`;
+      return `<tr>${editRow(`<td>${escHtml(h.label)}</td><td ${amtAttrs}>${fmtNum(h.amount)}</td><td class="krw-muted">${p ? fmtKRW.format(p) : "—"}</td><td>${fmtKRW.format(krw)}</td>`, h.id)}`;
     }).join("");
     wireEditRows(tbody);
   }
