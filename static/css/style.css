@@ -633,4 +633,26 @@ canvas { width: 100% !important; }
   .ret-params-grid  { grid-template-columns: repeat(2, 1fr); }
   .ret-proj-grid    { grid-template-columns: 1fr 1fr; }
   .table th:nth-child(4), .table td:nth-child(4) { display: none; }
+
+  /* Stock table card layout */
+  .stock-table thead { display: none; }
+  .stock-table, .stock-table tbody { display: block; }
+  .stock-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid var(--border-sub);
+  }
+  .stock-table tr:last-child { border-bottom: none; }
+  .stock-table td { padding: 0; border-bottom: none; }
+  /* restore 4th column for stock tables (overridden by general .table rule above) */
+  .stock-table td:nth-child(4) { display: block; }
+  .stock-table .col-label   { grid-column: 1; grid-row: 1; font-weight: 600; color: var(--text); }
+  .stock-table .col-krw-val { grid-column: 2; grid-row: 1; text-align: right; color: var(--gold); font-weight: 600; }
+  .stock-table .col-shares  { grid-column: 1; grid-row: 2; color: var(--text-muted); font-size: 0.8em; }
+  .stock-table .col-price   { grid-column: 2; grid-row: 2; text-align: right; color: var(--text-muted); font-size: 0.8em; }
+  /* hide USD value (US table) and action column — comes after td:nth-child(4) rule so wins on equal specificity */
+  .stock-table td.col-usd-val { display: none; }
+  .stock-table tr > td:last-child { display: none !important; }
 }
