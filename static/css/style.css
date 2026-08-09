@@ -120,6 +120,7 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
 .scard-gain-row { display: flex; align-items: baseline; gap: 0.35rem; margin-top: 0.25rem; flex-wrap: wrap; }
 .scard-gain-val { font-size: 0.78rem; font-weight: 700; }
 .scard-gain-pct { font-size: 0.7rem; opacity: 0.9; }
+.scard-cost-val { display: none; }
 .gain-pos { color: var(--green); }
 .gain-neg { color: var(--coral); }
 
@@ -633,6 +634,15 @@ canvas { width: 100% !important; }
   .ret-params-grid  { grid-template-columns: repeat(2, 1fr); }
   .ret-proj-grid    { grid-template-columns: 1fr 1fr; }
   .table th:nth-child(4), .table td:nth-child(4) { display: none; }
+
+  /* Total card 2-row layout */
+  .scard-total { flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+  .scard-total .scard-label { display: none; }
+  .scard-total .scard-value { font-size: 1.55rem; }
+  .scard-total .scard-gain-row { flex-direction: row; align-items: baseline; gap: 0.35rem; font-size: 0.78rem; }
+  .scard-total #sum-gain { display: none; }
+  .scard-cost-val { display: inline; color: var(--text-muted); font-size: 0.78rem; }
+  .scard-cost-val::after { content: " ·"; opacity: 0.5; }
 
   /* Stock table card layout */
   .stock-table thead { display: none; }

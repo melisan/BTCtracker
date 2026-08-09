@@ -364,6 +364,8 @@ function updateSummaryCards(bd) {
     pctEl.textContent = "(" + (pos ? "+" : "") + gainPct.toFixed(1) + "%)";
     pctEl.className   = "scard-gain-pct " + (pos ? "gain-pos" : "gain-neg");
   }
+  const costEl = document.getElementById("sum-cost");
+  if (costEl) costEl.textContent = fmtKRW.format(seedFund);
 }
 
 // ── Pie / Donut Chart ─────────────────────────────────────────
