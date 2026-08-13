@@ -5,6 +5,7 @@ import psycopg2.extras
 import os
 import re
 import time
+import math
 import logging
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -240,25 +241,29 @@ def fetch_crypto_history_krw(coin_id, days=400):
     return result
 
 
+def finite_close_history(hist):
+    """Convert yfinance rows to JSON-safe closing prices."""
+    result = {}
+    for date, row in hist.iterrows():
+        close = float(row["Close"])
+        if math.isfinite(close):
+            result[date.strftime("%Y-%m-%d")] = close
+    return result
+
+
 def fetch_stock_history_prices(ticker, days=400):
     import yfinance as yf
     t    = yf.Ticker(ticker)
     period = "2y" if days >= 365 else f"{days}d"
     hist = t.history(period=period, interval="1d")
-    result = {}
-    for date, row in hist.iterrows():
-        result[date.strftime("%Y-%m-%d")] = float(row["Close"])
-    return result
+    return finite_close_history(hist)
 
 
 def fetch_usdkrw_history(days=400):
     import yfinance as yf
     t    = yf.Ticker("USDKRW=X")
     hist = t.history(period=f"{min(days, 365)}d", interval="1d")
-    result = {}
-    for date, row in hist.iterrows():
-        result[date.strftime("%Y-%m-%d")] = float(row["Close"])
-    return result
+    return finite_close_history(hist)
 
 
 def get_nearest_price(price_dict, target_date):
@@ -418,7 +423,7 @@ def api_stocks_history():
     def fetch_one(app_key, yf_ticker):
         import yfinance as yf
         hist = yf.Ticker(yf_ticker).history(period="35d", interval="1d")
-        return app_key, {d.strftime("%Y-%m-%d"): float(row["Close"]) for d, row in hist.iterrows()}
+        return app_key, finite_close_history(hist)
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures = {ex.submit(fetch_one, k, v): k for k, v in yf_map.items()}
         for f in as_completed(futures, timeout=30):
