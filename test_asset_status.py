@@ -126,5 +126,17 @@ class SecurityTests(unittest.TestCase):
         stored = self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0]
         self.assertNotIn("synthetic-test-only-password",stored)
 
+    def test_initial_import_is_owner_only_and_cannot_overwrite_or_read(self):
+        self.assertEqual(self.client.post("/asset-status/initial-import",json=SAMPLE,headers=self.headers).status_code,403)
+        headers = {**self.headers,"X-Asset-Setup":setup_capability()}
+        imported = self.client.post("/asset-status/initial-import",json=SAMPLE,headers=headers)
+        self.assertEqual(imported.status_code,200)
+        self.assertNotIn("document", imported.json)
+        self.assertEqual(len(imported.json["digest"]),64)
+        self.assertEqual(self.client.post("/asset-status/initial-import",json=SAMPLE,headers=headers).status_code,409)
+        self.assertEqual(self.client.get("/asset-status/records",headers=headers).status_code,401)
+        self.unlock()
+        self.assertEqual(validate_document(self.client.get("/asset-status/records",headers=self.headers).json["document"]),validate_document(SAMPLE))
+
 
 if __name__ == "__main__": unittest.main()

@@ -1,6 +1,8 @@
 """One-time in-memory migration. Never writes workbook data to disk or stdout."""
 import argparse
 import getpass
+import hashlib
+import json
 import math
 import re
 import uuid
@@ -105,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("--url")
     parser.add_argument("--check-only", action="store_true")
     parser.add_argument("--configure-colors", action="store_true")
+    parser.add_argument("--owner-import", action="store_true")
     parser.add_argument("--total-scope", choices=["c1","all"], default="c1")
     args = parser.parse_args()
     try:
@@ -123,6 +126,16 @@ if __name__ == "__main__":
             if target.scheme != "https" or target.netloc != "btctracker-production.up.railway.app":
                 raise ValueError("Unexpected destination")
             base = f"https://{target.netloc}/asset-status"
+            if args.owner_import:
+                capability = getpass.getpass("Owner import capability (hidden): ")
+                response = requests.post(base + "/initial-import", json=data,
+                    headers={"X-Asset-Request":"1", "X-Asset-Setup":capability}, timeout=45, allow_redirects=False)
+                capability = None
+                digest = hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+                if response.status_code != 200 or response.json().get("digest") != digest:
+                    raise ValueError("Import verification failed")
+                print("Import and encrypted-storage verification complete. No local data copies were created.")
+                raise SystemExit(0)
             with requests.Session() as session:
                 session.headers.update({"X-Asset-Request":"1"})
                 password = getpass.getpass("App password (hidden): ")

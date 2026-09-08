@@ -246,8 +246,15 @@ def create_asset_blueprint(get_db, query):
         return response
 
     @bp.route("/records", methods=["GET", "POST", "PUT"])
+    @bp.post("/initial-import")
     def records():
         cfg = config()
+        owner_import = request.path.endswith("/initial-import")
+        if owner_import:
+            if not cfg:
+                return jsonify(error="보안 설정을 준비 중입니다."), 503
+            if not hmac.compare_digest(request.headers.get("X-Asset-Setup", ""), setup_capability()):
+                return jsonify(error="소유자 확인이 필요합니다."), 403
         conn = get_db()
         try:
             # Serialize creation and revisions without altering the database schema.
@@ -275,6 +282,11 @@ def create_asset_blueprint(get_db, query):
             else:
                 query(conn, "INSERT INTO tab_notes (tab, content) VALUES (%s, %s)", (PRIVATE_TAB, encrypted))
             conn.commit()
+            if owner_import:
+                saved = query(conn, "SELECT content FROM tab_notes WHERE tab = %s ORDER BY id LIMIT 1", (PRIVATE_TAB,)).fetchone()
+                verified = validate_document(json.loads(cfg[0].decrypt(saved["content"].encode())))
+                digest = hashlib.sha256(json.dumps(verified, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+                return jsonify(ok=True, digest=digest)
             return jsonify(document=clean, year=datetime.now(ZoneInfo("Asia/Seoul")).year)
         except (InvalidToken, json.JSONDecodeError):
             return jsonify(error="저장된 내용을 열 수 없습니다. 보안 설정을 확인해 주세요."), 503

@@ -34,6 +34,10 @@ run it with the local workbook path, the verified production URL, and
 `--configure-colors`. Names and the existing app password are entered with hidden
 prompts, and are never written into code or command-line arguments. Initial import
 refuses to overwrite an existing document and verifies the saved result in memory.
+The optional `--owner-import` mode accepts a hidden owner capability instead of
+the shared password. It only creates an absent record, cannot read records, and
+returns a digest of the decrypted database record for in-memory verification.
+It permits preparing encrypted content before the owner chooses their password.
 
 The import maps the approved workbook structure:
 
