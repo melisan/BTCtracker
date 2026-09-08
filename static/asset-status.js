@@ -1,11 +1,18 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
-  let setupToken = new URLSearchParams(location.hash.slice(1)).get("setup") || "";
-  if (setupToken) {
-    history.replaceState(null,"",location.pathname);
-    $("setup-form").hidden=false; $("unlock-form").hidden=true;
-  }
+  let setupToken = "";
+  $("start-setup").addEventListener("click",()=>{$("owner-form").hidden=false;$("start-setup").hidden=true;});
+  $("owner-form").addEventListener("submit",async event=>{
+    event.preventDefault();const button=event.submitter;button.disabled=true;
+    setupToken=$("owner-code").value;$("owner-code").value="";
+    try{
+      await api("setup-access","POST",{});
+      $("owner-form").hidden=true;$("unlock-form").hidden=true;$("setup-form").hidden=false;
+      message("소유자 확인을 완료했습니다. 사용할 비밀번호를 정해 주세요.");
+    }catch(error){setupToken="";message(error.message,true);}
+    finally{button.disabled=false;}
+  });
   $("setup-form").addEventListener("submit",async event=>{
     event.preventDefault();
     const password=$("new-password").value;
@@ -41,7 +48,7 @@
     document.querySelectorAll("[data-sensitive]").forEach(el=>el.textContent="");
     document.querySelectorAll("[data-document-field]").forEach(el=>el.value="");
     $("updated").textContent=""; $("password").value="";
-    ["new-password","confirm-password","workbook-file","blue-name","green-name"].forEach(id=>$(id).value="");
+    ["owner-code","new-password","confirm-password","workbook-file","blue-name","green-name"].forEach(id=>$(id).value="");
     $("workspace").hidden=true; $("locked").hidden=false;
   }
   async function lock(automatic=false) {
@@ -200,6 +207,6 @@
   }));
   $("lock").addEventListener("click",()=>lock());
   window.addEventListener("beforeunload",event=>{if(dirty){event.preventDefault();event.returnValue="";}});
-  window.addEventListener("pagehide",()=>{clear();fetch("/asset-status/lock",{method:"POST",headers:{"X-Asset-Request":"1"},keepalive:true}).catch(()=>{});});
+  window.addEventListener("pagehide",()=>{setupToken="";clear();fetch("/asset-status/lock",{method:"POST",headers:{"X-Asset-Request":"1"},keepalive:true}).catch(()=>{});});
   window.addEventListener("pageshow",event=>{if(event.persisted){clear();message("비밀번호를 다시 입력해 주세요.");}});
 })();

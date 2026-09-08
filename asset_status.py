@@ -214,6 +214,17 @@ def create_asset_blueprint(get_db, query):
                             samesite="Strict", path="/asset-status")
         return response
 
+    @bp.post("/setup-access")
+    def setup_access():
+        cfg = config()
+        if not cfg:
+            return jsonify(error="보안 설정을 준비 중입니다."), 503
+        if not hmac.compare_digest(request.headers.get("X-Asset-Setup", ""), setup_capability()):
+            return jsonify(error="소유자 확인 코드가 올바르지 않습니다."), 403
+        if cfg[2]:
+            return jsonify(error="이미 비밀번호가 설정되어 있습니다. 비밀번호로 열어 주세요."), 409
+        return jsonify(ok=True)
+
     @bp.post("/setup")
     def setup():
         cfg = config()

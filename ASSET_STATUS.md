@@ -10,8 +10,9 @@ The import control disappears after initial storage and refuses overwriting.
 ## Configuration
 
 - The asset tab uses a dedicated shared password, independent of `ADMIN_PASSWORD`.
-  An owner-only initial setup link carries an HMAC capability in its fragment;
-  the page removes it immediately from the address. Setup is single-use and stores
+  Owner-only initial setup accepts an HMAC capability through a masked field,
+  clears the field, and keeps it only in page memory; it never enters a URL.
+  Setup is single-use and stores
   only a scrypt password hash inside encrypted storage. Authorized people can unlock
   with the same password. No records are accessible before setup.
 - Configure a stable, random Fernet key as `ASSET_STATUS_KEY` in the app's Railway

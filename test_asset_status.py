@@ -126,6 +126,15 @@ class SecurityTests(unittest.TestCase):
         stored = self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0]
         self.assertNotIn("synthetic-test-only-password",stored)
 
+    def test_owner_setup_access_without_url_secrets(self):
+        self.db.execute("DELETE FROM tab_notes WHERE tab=?",(AUTH_TAB,));self.db.commit()
+        self.assertEqual(self.client.post("/asset-status/setup-access",json={},headers=self.headers).status_code,403)
+        headers={**self.headers,"X-Asset-Setup":setup_capability()}
+        self.assertEqual(self.client.post("/asset-status/setup-access",json={},headers=headers).status_code,200)
+        self.assertEqual(self.client.post("/asset-status/setup",json={"password":"short"},headers=headers).status_code,400)
+        self.assertEqual(self.client.post("/asset-status/setup",json={"password":"synthetic-test-only-password"},headers=headers).status_code,200)
+        self.assertEqual(self.client.post("/asset-status/setup-access",json={},headers=headers).status_code,409)
+
     def test_initial_import_is_owner_only_and_cannot_overwrite_or_read(self):
         self.assertEqual(self.client.post("/asset-status/initial-import",json=SAMPLE,headers=self.headers).status_code,403)
         headers = {**self.headers,"X-Asset-Setup":setup_capability()}
