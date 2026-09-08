@@ -58,11 +58,17 @@ def export_workbook(data, today):
     headers = ["항목", "이름", "내용", "계좌번호", "원본총액", "이자", "내용(비고)", "만기일"]
     def account_values(row):
         return [date.fromisoformat(row[f]) if f == "maturity" and row.get(f) else row.get(f) for f in fields]
-    ws = sheet("전체자산", headers, [account_values(r) for r in total], amount(total)+amount(data.get("other_assets", [])))
+    consumed = lambda r: r["category"] == "예적금" and bool(r.get("maturity") and r["maturity"] < "2026-06-01")
+    ws = sheet("전체자산", headers+["구분"], [account_values(r)+["이미 소비한 자산" if consumed(r) else "보유자산"] for r in sorted(total,key=lambda r:not consumed(r))], amount(total)+amount(data.get("other_assets", [])), "2026년 6월 1일 이전 만기 예·적금을 구분하며, 전체자산 합계에는 두 구역을 모두 포함합니다.")
     for r in data.get("other_assets", []):
         ws.append(["기타", "", r["description"], "", r["amount"], None, r["notes"]])
         for c in ws[ws.max_row]:
             if isinstance(c.value,str): c.data_type="s"
+    ws.append([])
+    overall = amount(total)+amount(data.get("other_assets", []))
+    spent = amount([r for r in total if consumed(r)])
+    for label, value in (("전체자산 (처음자산)",overall),("이미 소비한 자산",spent),("보유자산 (자산현황)",overall-spent)):
+        ws.append([label,value]);ws.cell(ws.max_row,2).number_format='#,##0.00'
     completed = lambda r: bool(r.get("maturity", "").startswith("2026-") and r["maturity"] < today.isoformat())
     sheet("이전대상채권", ["상태","연도"]+headers, [["이전완료" if completed(r) else "이전대기",r["year"]]+account_values(r) for r in sorted(bonds,key=lambda r:(not completed(r),r["year"]))], amount(bonds)+amount(bonds,"interest"), data.get("bond_notes", ""))
     sheet("자금이동대상", headers+["이동 검토 메모","연결"], [account_values(r)+[r.get("review_notes",""),"보유자산 연결" if r.get("source_id") else "직접 입력"] for r in movement], amount(movement), data.get("movement_notes", ""))

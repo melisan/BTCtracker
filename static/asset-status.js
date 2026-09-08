@@ -45,6 +45,7 @@
   const yearNow = () => Number(new Intl.DateTimeFormat("en",{timeZone:"Asia/Seoul",year:"numeric"}).format(new Date()));
   const todayKorea = () => {const parts=new Intl.DateTimeFormat("en",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());return ["year","month","day"].map(type=>parts.find(p=>p.type===type).value).join("-");};
   const bondCompleted = row => Boolean(row.maturity?.startsWith("2026-") && row.maturity<todayKorea());
+  const consumedAsset = row => row.group==="total" && row.category==="예적금" && Boolean(row.maturity && row.maturity<"2026-06-01");
   let renderedDay="";
   const sum = (rows,field="amount") => rows.reduce((n,r) => n+(r[field] ?? 0),0);
   function message(text,error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
@@ -92,7 +93,9 @@
   function totals() {
     if(!data) return;
     const total=data.accounts.filter(r=>r.group==="total"), deposits=total.filter(r=>r.category==="예적금");
-    $("overall-total").textContent=money(sum(total)+sum(data.other_assets||[]));
+    const overall=sum(total)+sum(data.other_assets||[]),consumed=sum(total.filter(consumedAsset));
+    $("overall-total").textContent=money(overall);$("held-total").textContent=money(overall-consumed);
+    document.querySelectorAll("[data-asset-subtotal]").forEach(el=>el.textContent=`원본총액 ${money(el.dataset.assetSubtotal==="consumed"?consumed:overall-consumed)}`);
     $("total").textContent=money(sum(deposits)); $("interest-total").textContent=money(sum(deposits,"interest"));
     const year=yearNow(); $("year-label").textContent=`${year}년 만기 (전체자산·채권)`;
     $("due-total").textContent=`${data.accounts.filter(r=>r.group!=="movement" && r.maturity && Number(r.maturity.slice(0,4))===year).length}건`;
@@ -137,7 +140,7 @@
       changed(); if(field==="year") render();
     });
     if(formattedMoney)input.addEventListener("blur",()=>{if(input.validity.valid)formatMoney();});
-    if(field==="maturity" && row.group==="bonds")input.addEventListener("change",render);
+    if((field==="maturity" && ["bonds","total"].includes(row.group)) || (field==="category" && row.group==="total"))input.addEventListener("change",render);
     return input;
   }
   function buildTable(headers,compact=false) {
@@ -180,8 +183,13 @@
     syncMovement();
     renderedDay=todayKorea();
     $("initial-import").hidden=Boolean(data.revision);
-    ["total"].forEach(group=>{
-      const target=$(`${group}-accounts`);target.replaceChildren(accountTable(group,data.accounts.filter(r=>r.group===group),groups[group]));
+    const owned=data.accounts.filter(r=>r.group==="total"),ownedTarget=$("total-accounts");ownedTarget.replaceChildren();
+    [{title:"이미 소비한 자산 (2026년 6월 이전 채권 이동)",key:"consumed",prefix:"이미 소비한 자산",rows:owned.filter(consumedAsset)},
+      {title:"보유자산",key:"held",prefix:"보유자산",rows:owned.filter(r=>!consumedAsset(r))}].forEach(group=>{
+      const heading=document.createElement("h3"),subtotal=document.createElement("p");heading.textContent=group.title;
+      if(group.key==="held"){const small=document.createElement("small");small.textContent=" (자산현황)";heading.append(small);}
+      subtotal.className="hint";subtotal.dataset.assetSubtotal=group.key;subtotal.textContent=`원본총액 ${money(sum(group.rows))}`;
+      ownedTarget.append(heading,subtotal,accountTable("total",group.rows,group.prefix));
     });
     const bonds=$("bonds-accounts");bonds.replaceChildren();
     const completedTitle=document.createElement("h3"),waitingTitle=document.createElement("h3"),rule=document.createElement("p");

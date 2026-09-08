@@ -73,6 +73,9 @@ copies source fields, rejects missing/duplicate references, and preserves a sepa
 review note. Movement references never enter the overall total. Existing rows link
 only on a unique exact category/name/account/description/maturity match; unmatched
 rows remain editable. Amount fields show thousands separators outside editing.
+Overall assets are displayed as consumed (deposit maturity before 2026-06-01)
+and held. The original overall total includes both; the separate held balance is
+overall minus consumed principal. The same grouping and balances appear in export.
 
 Run `python -m unittest -v test_asset_status` and JavaScript syntax checks. Browser
 verification uses synthetic data only. Check password denial, lock/unlock, save and

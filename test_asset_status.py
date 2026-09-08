@@ -205,5 +205,20 @@ class SecurityTests(unittest.TestCase):
         duplicate=copy.deepcopy(linked);duplicate["id"]="duplicate";sample["accounts"].append(duplicate)
         with self.assertRaises(ValueError):validate_document(sample)
 
+    def test_consumed_assets_keep_original_total_and_have_separate_balance(self):
+        from asset_export import export_workbook
+        data=validate_document(SAMPLE)
+        data["accounts"][0]["maturity"]="2026-05-31"
+        for row_id, category, maturity in (("cutoff","예적금","2026-06-01"),("coin","코인","2026-01-01")):
+            row=copy.deepcopy(data["accounts"][0]);row.update(id=row_id,category=category,maturity=maturity)
+            data["accounts"].append(row)
+        book=openpyxl.load_workbook(export_workbook(data,date(2026,9,8)))
+        ws=book["전체자산"]
+        self.assertEqual(ws["B1"].value,300000)
+        self.assertEqual([ws.cell(r,9).value for r in range(4,7)],["이미 소비한 자산","보유자산","보유자산"])
+        self.assertEqual(ws.cell(ws.max_row,1).value,"보유자산 (자산현황)")
+        self.assertEqual(ws.cell(ws.max_row,2).value,200000)
+        book.close()
+
 
 if __name__ == "__main__": unittest.main()
