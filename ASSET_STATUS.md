@@ -6,8 +6,11 @@ third-party assets, browser storage, or workbook upload widget.
 
 ## Configuration
 
-- Keep the existing non-default `ADMIN_PASSWORD`. The feature fails closed when it
-  is missing or still uses the legacy default.
+- The asset tab uses a dedicated shared password, independent of `ADMIN_PASSWORD`.
+  An owner-only initial setup link carries an HMAC capability in its fragment;
+  the page removes it immediately from the address. Setup is single-use and stores
+  only a scrypt password hash inside encrypted storage. Authorized people can unlock
+  with the same password. No records are accessible before setup.
 - Configure a stable, random Fernet key as `ASSET_STATUS_KEY` in the app's Railway
   environment. Never print it, commit it, or regenerate it on restart. Losing or
   replacing this key makes the saved records unreadable. Password rotation does
@@ -21,7 +24,7 @@ third-party assets, browser storage, or workbook upload widget.
 
 One encrypted JSON record is stored under the reserved `__private_asset_status__`
 tab in the existing notes table. Public notes routes cannot read or modify this
-record. No schema changes, personal source files, or plaintext records are needed
+record or the reserved `__private_asset_auth__` authentication record. No schema changes, personal source files, or plaintext records are needed
 in the repository. Revision checks prevent overwriting another device's edits.
 
 `import_asset_status.py` is a one-time maintenance tool. Its `--check-only` mode

@@ -9,7 +9,7 @@ import math
 import logging
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from asset_status import create_asset_blueprint, PRIVATE_TAB
+from asset_status import create_asset_blueprint, PRIVATE_TAB, AUTH_TAB
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
@@ -901,7 +901,7 @@ def api_patch_snapshot():
 @app.route("/api/notes")
 def api_get_notes():
     tab  = request.args.get("tab", "").strip()
-    if tab == PRIVATE_TAB:
+    if tab in (PRIVATE_TAB, AUTH_TAB):
         return jsonify({"error": "Not found"}), 404
     conn = get_db()
     cur  = query(conn, """
@@ -921,7 +921,7 @@ def api_get_notes():
 def api_add_note():
     data    = request.get_json() or {}
     tab     = (data.get("tab") or "").strip()
-    if tab == PRIVATE_TAB:
+    if tab in (PRIVATE_TAB, AUTH_TAB):
         return jsonify({"error": "Not found"}), 404
     content = (data.get("content") or "").strip()
     if not tab or not content:
@@ -937,7 +937,7 @@ def api_add_note():
 @app.route("/api/notes/<int:nid>/pin", methods=["POST"])
 def api_toggle_pin(nid):
     conn = get_db()
-    cur  = query(conn, "SELECT pinned FROM tab_notes WHERE id = %s AND tab <> %s", (nid, PRIVATE_TAB))
+    cur  = query(conn, "SELECT pinned FROM tab_notes WHERE id = %s AND tab NOT IN (%s, %s)", (nid, PRIVATE_TAB, AUTH_TAB))
     row  = cur.fetchone()
     if not row:
         conn.close()
@@ -956,7 +956,7 @@ def api_edit_note(nid):
     if not content:
         return jsonify({"error": "content required"}), 400
     conn = get_db()
-    query(conn, "UPDATE tab_notes SET content = %s WHERE id = %s AND tab <> %s", (content, nid, PRIVATE_TAB))
+    query(conn, "UPDATE tab_notes SET content = %s WHERE id = %s AND tab NOT IN (%s, %s)", (content, nid, PRIVATE_TAB, AUTH_TAB))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -965,7 +965,7 @@ def api_edit_note(nid):
 @app.route("/api/notes/<int:nid>", methods=["DELETE"])
 def api_delete_note(nid):
     conn = get_db()
-    query(conn, "DELETE FROM tab_notes WHERE id = %s AND tab <> %s", (nid, PRIVATE_TAB))
+    query(conn, "DELETE FROM tab_notes WHERE id = %s AND tab NOT IN (%s, %s)", (nid, PRIVATE_TAB, AUTH_TAB))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})

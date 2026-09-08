@@ -1,6 +1,23 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
+  let setupToken = new URLSearchParams(location.hash.slice(1)).get("setup") || "";
+  if (setupToken) {
+    history.replaceState(null,"",location.pathname);
+    $("setup-form").hidden=false; $("unlock-form").hidden=true;
+  }
+  $("setup-form").addEventListener("submit",async event=>{
+    event.preventDefault();
+    const password=$("new-password").value;
+    if(password!==$("confirm-password").value){message("비밀번호가 일치하지 않습니다.",true);return;}
+    const button=event.submitter; button.disabled=true;
+    try {
+      await api("setup","POST",{password}); setupToken="";
+      $("setup-form").hidden=true; $("unlock-form").hidden=false;
+      message("비밀번호를 설정했습니다. 설정한 비밀번호로 열어 주세요.");
+    } catch(error){message(error.message,true);}
+    finally {$("new-password").value="";$("confirm-password").value="";button.disabled=false;}
+  });
   const groups = {total:"전체자산",bonds:"이전대상채권",movement:"자금이동대상"};
   const fields = ["category","name","description","account","amount","interest","notes","maturity"];
   const labels = ["항목","이름","내용","계좌번호","원본총액 (원)","이자 (원)","내용(비고)","만기일"];
@@ -12,7 +29,7 @@
   function changed() { dirty=true; totals(); message("수정한 내용이 있습니다. 변경사항을 저장해 주세요."); }
   async function api(path,method="GET",body) {
     const response=await fetch(`/asset-status/${path}`,{method,credentials:"same-origin",cache:"no-store",
-      headers:{"Content-Type":"application/json","X-Asset-Request":"1","X-Asset-Token":token},
+      headers:{"Content-Type":"application/json","X-Asset-Request":"1","X-Asset-Token":token,"X-Asset-Setup":setupToken},
       body:body===undefined?undefined:JSON.stringify(body)});
     const result=await response.json();
     if(!response.ok) throw new Error(result.error || "요청을 완료하지 못했습니다.");

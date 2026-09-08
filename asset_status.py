@@ -13,10 +13,16 @@ from zoneinfo import ZoneInfo
 from cryptography.fernet import Fernet, InvalidToken
 from flask import Blueprint, jsonify, make_response, render_template, request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
+from werkzeug.security import generate_password_hash, check_password_hash
 
 PRIVATE_TAB = "__private_asset_status__"
+AUTH_TAB = "__private_asset_auth__"
 SESSION_SECONDS = 900
 MAX_BYTES = 1_000_000
+
+
+def setup_capability():
+    return hmac.new(os.environ["ASSET_STATUS_KEY"].encode(), b"asset-status-owner-setup", hashlib.sha256).hexdigest()
 
 
 def validate_document(data):
@@ -106,22 +112,30 @@ def create_asset_blueprint(get_db, query):
     attempts = {}
     mutex = threading.Lock()
 
+    def load_auth(cipher):
+        conn = get_db()
+        try:
+            row = query(conn, "SELECT content FROM tab_notes WHERE tab = %s ORDER BY id LIMIT 1", (AUTH_TAB,)).fetchone()
+            return json.loads(cipher.decrypt(row["content"].encode())) if row else None
+        finally:
+            conn.close()
+
     def config():
         key = os.environ.get("ASSET_STATUS_KEY", "")
-        password = os.environ.get("ADMIN_PASSWORD", "")
-        if not key or not password or password == "admin1234":
+        if not key:
             return None
         try:
-            return Fernet(key.encode()), URLSafeTimedSerializer(key, salt="asset-status-session"), password
-        except (ValueError, TypeError):
+            cipher = Fernet(key.encode())
+            return cipher, URLSafeTimedSerializer(key, salt="asset-status-session"), load_auth(cipher)
+        except Exception:
             return None
 
     def authenticated(cfg):
-        if not cfg:
+        if not cfg or not cfg[2]:
             return False
         try:
             value = cfg[1].loads(request.cookies.get("asset_session", ""), max_age=SESSION_SECONDS)
-            fingerprint = hmac.new(os.environ["ASSET_STATUS_KEY"].encode(), cfg[2].encode(), hashlib.sha256).hexdigest()
+            fingerprint = cfg[2]["id"]
             token = request.headers.get("X-Asset-Token", "")
             return (isinstance(value, dict) and bool(token)
                     and hmac.compare_digest(value.get("password", ""), fingerprint)
@@ -169,6 +183,8 @@ def create_asset_blueprint(get_db, query):
         cfg = config()
         if not cfg:
             return jsonify(error="자산 현황의 보안 설정이 아직 완료되지 않았습니다."), 503
+        if not cfg[2]:
+            return jsonify(error="소유자가 먼저 자산현황 비밀번호를 설정해야 합니다."), 409
         # Per-worker rate limit; bounded memory and no password/IP logging.
         ip = request.remote_addr or "unknown"
         now = time.monotonic()
@@ -183,11 +199,11 @@ def create_asset_blueprint(get_db, query):
             attempts[ip] = (start, count + 1)
         data = request.get_json(silent=True) or {}
         password = data.get("password", "") if isinstance(data, dict) else ""
-        if not isinstance(password, str) or not hmac.compare_digest(password.encode(), cfg[2].encode()):
+        if not isinstance(password, str) or len(password) > 256 or not check_password_hash(cfg[2]["hash"], password):
             return jsonify(error="비밀번호가 올바르지 않습니다."), 401
         with mutex:
             attempts.pop(ip, None)
-        fingerprint = hmac.new(os.environ["ASSET_STATUS_KEY"].encode(), cfg[2].encode(), hashlib.sha256).hexdigest()
+        fingerprint = cfg[2]["id"]
         token = secrets.token_urlsafe(32)
         response = jsonify(ok=True, expires_in=SESSION_SECONDS, token=token)
         signed = cfg[1].dumps({"password":fingerprint, "token":hashlib.sha256(token.encode()).hexdigest()})
@@ -195,6 +211,33 @@ def create_asset_blueprint(get_db, query):
                             httponly=True, secure=not request.host.startswith(("127.0.0.1:", "localhost:")),
                             samesite="Strict", path="/asset-status")
         return response
+
+    @bp.post("/setup")
+    def setup():
+        cfg = config()
+        if not cfg:
+            return jsonify(error="보안 설정을 준비 중입니다."), 503
+        supplied = request.headers.get("X-Asset-Setup", "")
+        if not hmac.compare_digest(supplied, setup_capability()):
+            return jsonify(error="소유자 전용 설정 화면에서 진행해 주세요."), 403
+        data = request.get_json(silent=True)
+        password = data.get("password") if isinstance(data, dict) else None
+        if not isinstance(password, str) or not 12 <= len(password) <= 256:
+            return jsonify(error="비밀번호는 12자 이상 256자 이하로 입력해 주세요."), 400
+        conn = get_db()
+        try:
+            query(conn, "SELECT pg_advisory_xact_lock(731902841)")
+            if query(conn, "SELECT id FROM tab_notes WHERE tab = %s", (AUTH_TAB,)).fetchone():
+                return jsonify(error="이미 비밀번호가 설정되어 있습니다."), 409
+            auth = {"hash":generate_password_hash(password), "id":secrets.token_hex(32)}
+            encrypted = cfg[0].encrypt(json.dumps(auth).encode()).decode()
+            query(conn, "INSERT INTO tab_notes (tab, content) VALUES (%s, %s)", (AUTH_TAB, encrypted))
+            conn.commit()
+            return jsonify(ok=True)
+        except Exception:
+            return jsonify(error="비밀번호를 저장하지 못했습니다. 다시 시도해 주세요."), 503
+        finally:
+            conn.close()
 
     @bp.post("/lock")
     def lock():

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 from flask import Flask
-from asset_status import create_asset_blueprint, PRIVATE_TAB, validate_document
+from asset_status import create_asset_blueprint, PRIVATE_TAB, AUTH_TAB, setup_capability, validate_document
 
 
 SAMPLE = {"accounts":[{"id":"sample-1", "in_total":True, "category":"예적금", "name":"가상 이름", "description":"가상 예금",
@@ -38,6 +38,7 @@ class SecurityTests(unittest.TestCase):
         self.app, self.db = fixture()
         self.client = self.app.test_client()
         self.headers = {"X-Asset-Request":"1"}
+        self.client.post("/asset-status/setup",json={"password":"synthetic-test-only-password"},headers={**self.headers,"X-Asset-Setup":setup_capability()})
     def tearDown(self):
         self.db.close(); self.env.stop()
     def unlock(self):
@@ -54,7 +55,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.unlock().status_code,429)
     def test_missing_configuration_fails_closed(self):
         with patch.dict(os.environ,{"ASSET_STATUS_KEY":""}): self.assertEqual(self.unlock().status_code,503)
-        with patch.dict(os.environ,{"ADMIN_PASSWORD":"admin1234"}): self.assertEqual(self.unlock().status_code,503)
+        with patch.dict(os.environ,{"ADMIN_PASSWORD":"admin1234"}): self.assertEqual(self.unlock().status_code,200)
     def test_origin_and_header(self):
         self.assertEqual(self.client.post("/asset-status/unlock",json={}).status_code,403)
         self.assertEqual(self.client.post("/asset-status/unlock",json={},headers={**self.headers,"Origin":"https://untrusted.example"}).status_code,403)
@@ -90,7 +91,7 @@ class SecurityTests(unittest.TestCase):
         self.unlock(); self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers)
         with patch.dict(os.environ,{"ASSET_STATUS_KEY":Fernet.generate_key().decode()}):
             self.unlock()
-            self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,503)
+            self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,401)
 
     def test_public_notes_cannot_read_or_modify_private_storage(self):
         # Load route definitions without running existing production startup migrations.
@@ -105,14 +106,25 @@ class SecurityTests(unittest.TestCase):
             def close(inner): pass
         namespace["get_db"] = lambda: Connection()
         namespace["query"] = lambda conn,sql,args=(): self.db.execute(sql.replace("%s","?"),args)
-        self.db.execute("INSERT INTO tab_notes (id,tab,content) VALUES (1,?,?)",(PRIVATE_TAB,"ciphertext"))
+        self.db.execute("INSERT INTO tab_notes (id,tab,content) VALUES (100,?,?)",(PRIVATE_TAB,"ciphertext"))
         client = namespace["app"].test_client()
         self.assertEqual(client.get("/api/notes",query_string={"tab":PRIVATE_TAB}).status_code,404)
         self.assertEqual(client.post("/api/notes",json={"tab":PRIVATE_TAB,"content":"attack"}).status_code,404)
-        self.assertEqual(client.post("/api/notes/1/pin",json={}).status_code,404)
-        client.put("/api/notes/1",json={"content":"attack"})
-        client.delete("/api/notes/1")
-        self.assertEqual(self.db.execute("SELECT content FROM tab_notes WHERE id=1").fetchone()[0],"ciphertext")
+        for nid, tab in [(100, PRIVATE_TAB), (1, AUTH_TAB)]:
+            original = self.db.execute("SELECT content FROM tab_notes WHERE id=?",(nid,)).fetchone()[0]
+            self.assertEqual(client.get("/api/notes",query_string={"tab":tab}).status_code,404)
+            self.assertEqual(client.post(f"/api/notes/{nid}/pin",json={}).status_code,404)
+            client.put(f"/api/notes/{nid}",json={"content":"attack"})
+            client.delete(f"/api/notes/{nid}")
+            self.assertEqual(self.db.execute("SELECT content FROM tab_notes WHERE id=?",(nid,)).fetchone()[0],original)
+
+    def test_owner_only_setup_and_no_reset(self):
+        headers = {**self.headers,"X-Asset-Setup":setup_capability()}
+        self.assertEqual(self.client.post("/asset-status/setup",json={"password":"replacement-password"},headers=self.headers).status_code,403)
+        self.assertEqual(self.client.post("/asset-status/setup",json={"password":"replacement-password"},headers=headers).status_code,409)
+        self.assertEqual(self.unlock().status_code,200)
+        stored = self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0]
+        self.assertNotIn("synthetic-test-only-password",stored)
 
 
 if __name__ == "__main__": unittest.main()

@@ -14,6 +14,12 @@
   <section id="locked" class="gate">
     <p class="eyebrow">ASSET STATUS</p><h1>자산 현황</h1>
     <p>비밀번호를 입력하면 저장된 내용을 보고 수정할 수 있습니다.</p>
+    <form id="setup-form" hidden autocomplete="off">
+      <h2>자산현황 비밀번호 설정</h2><p class="hint">12자 이상으로 설정해 주세요. 허용하신 분도 같은 비밀번호로 볼 수 있습니다.</p>
+      <label for="new-password">새 비밀번호</label><input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+      <label for="confirm-password">비밀번호 확인</label><input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+      <button>비밀번호 설정</button>
+    </form>
     <form id="unlock-form" autocomplete="off">
       <label for="password">비밀번호</label>
       <div class="password-row"><input id="password" type="password" autocomplete="off" required maxlength="256"><button>열기</button></div>
