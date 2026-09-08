@@ -60,6 +60,14 @@ not included in this source tree.
 
 ## Verification
 
+All five sections support explicit edit mode and a local save button. Each save
+commits the entire document with revision protection and returns sections to read
+mode. Manual saves never validate the optional workbook picker. Export requires
+authentication, streams a five-sheet XLSX from memory, and forces user-entered
+strings to text cells. Print replaces controls with text only for the print layout.
+2026 maturities before the current Korean date appear under completed bonds;
+remaining bonds appear under waiting, grouped by year. Export uses the same rule.
+
 Run `python -m unittest -v test_asset_status` and JavaScript syntax checks. Browser
 verification uses synthetic data only. Check password denial, lock/unlock, save and
 reload, category choices, year regrouping, additions to all editable sections,

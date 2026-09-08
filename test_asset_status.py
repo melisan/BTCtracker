@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 import sqlite3
 import unittest
+from io import BytesIO
+from datetime import date
+import openpyxl
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
@@ -157,6 +160,34 @@ class SecurityTests(unittest.TestCase):
             reader.reset_mock()
             self.assertEqual(self.client.post("/asset-status/initial-workbook",data=b"replacement",headers=self.headers).status_code,409)
             reader.assert_not_called()
+
+    def test_export_requires_password_and_preserves_safe_cell_types(self):
+        self.assertEqual(self.client.post("/asset-status/export",headers=self.headers).status_code,401)
+        self.unlock()
+        sample=copy.deepcopy(SAMPLE)
+        sample["accounts"][0]["description"]="=1+1"
+        self.client.post("/asset-status/records",json=sample,headers=self.headers)
+        response=self.client.post("/asset-status/export",headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertIn("attachment",response.headers["Content-Disposition"])
+        self.assertIn("no-store",response.headers["Cache-Control"])
+        book=openpyxl.load_workbook(BytesIO(response.data))
+        self.assertEqual(book.sheetnames,["전체자산","이전대상채권","자금이동대상","미래충족금액","소모비용"])
+        self.assertEqual(book["전체자산"]["C4"].data_type,"s")
+        self.assertEqual(book["전체자산"]["D4"].value,"001-000-000")
+        self.assertEqual(book["전체자산"]["E4"].value,100000)
+        book.close()
+
+    def test_export_bond_completion_date_boundary(self):
+        from asset_export import export_workbook
+        data=validate_document(SAMPLE)
+        for i, maturity in enumerate(("2026-09-07","2026-09-08","2026-09-09","2025-01-01","")):
+            row=copy.deepcopy(data["accounts"][0]);row.update(id=f"bond-{i}",group="bonds",year=2026,maturity=maturity)
+            data["accounts"].append(row)
+        book=openpyxl.load_workbook(export_workbook(data,date(2026,9,8)))
+        statuses=[book["이전대상채권"].cell(r,1).value for r in range(4,9)]
+        self.assertEqual(statuses,["이전완료"]+["이전대기"]*4)
+        book.close()
 
 
 if __name__ == "__main__": unittest.main()

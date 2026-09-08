@@ -29,11 +29,25 @@
   const fields = ["category","name","description","account","amount","interest","notes","maturity"];
   const labels = ["항목","이름","내용","계좌번호","원본총액 (원)","이자 (원)","내용(비고)","만기일"];
   let data = null, token = "", dirty = false, saving = false, timer = null, deadline = 0, generation = 0;
+  const editingSections = new Set();
+  function applyEditState(){
+    document.querySelectorAll(".asset-section").forEach(section=>{
+      const editing=editingSections.has(section.id);
+      section.querySelectorAll("input,select,textarea,button:not(.section-edit):not(.section-save-button)").forEach(el=>el.disabled=saving||!editing);
+      const edit=section.querySelector(".section-edit"),save=section.querySelector(".section-save-button");
+      if(edit){edit.disabled=saving||editing;edit.textContent=editing?"수정 중":"수정";}
+      if(save)save.disabled=saving||!editing;
+    });
+    $("save").disabled=saving;
+  }
   const money = n => new Intl.NumberFormat("ko-KR",{maximumFractionDigits:2}).format(n)+"원";
   const yearNow = () => Number(new Intl.DateTimeFormat("en",{timeZone:"Asia/Seoul",year:"numeric"}).format(new Date()));
+  const todayKorea = () => {const parts=new Intl.DateTimeFormat("en",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());return ["year","month","day"].map(type=>parts.find(p=>p.type===type).value).join("-");};
+  const bondCompleted = row => Boolean(row.maturity?.startsWith("2026-") && row.maturity<todayKorea());
+  let renderedDay="";
   const sum = (rows,field="amount") => rows.reduce((n,r) => n+(r[field] ?? 0),0);
   function message(text,error=false) { $("message").textContent=text; $("message").classList.toggle("error",error); }
-  function changed() { dirty=true; totals(); message("수정한 내용이 있습니다. 변경사항을 저장해 주세요."); }
+  function changed() { dirty=true; totals(); document.querySelectorAll(".section-save-status").forEach(el=>el.textContent="");message("수정한 내용이 있습니다. 변경사항을 저장해 주세요."); }
   async function api(path,method="GET",body) {
     const response=await fetch(`/asset-status/${path}`,{method,credentials:"same-origin",cache:"no-store",
       headers:{"Content-Type":"application/json","X-Asset-Request":"1","X-Asset-Token":token,"X-Asset-Setup":setupToken},
@@ -44,6 +58,8 @@
   }
   function clear() {
     generation++; data=null; token=""; dirty=false; clearInterval(timer); timer=null;
+    editingSections.clear();
+    document.querySelectorAll(".print-value").forEach(el=>el.remove());
     document.querySelectorAll(".sensitive-table").forEach(el=>el.replaceChildren());
     document.querySelectorAll("[data-sensitive]").forEach(el=>el.textContent="");
     document.querySelectorAll("[data-document-field]").forEach(el=>el.value="");
@@ -76,7 +92,7 @@
         $("bonds-interest").textContent=money(interest);$("bonds-combined").textContent=money(principal+interest);
         available=principal+interest;
         document.querySelectorAll("[data-bond-year-total]").forEach(el=>{
-          const subset=rows.filter(r=>r.year===Number(el.dataset.bondYearTotal));
+          const subset=rows.filter(r=>r.year===Number(el.dataset.bondYearTotal)&&!bondCompleted(r));
           el.textContent=`원본총액 ${money(sum(subset))} · 이자 ${money(sum(subset,"interest"))}`;
         });
       }
@@ -104,6 +120,7 @@
       if(field==="name") applyNameColor(input,input.value);
       changed(); if(field==="year") render();
     });
+    if(field==="maturity" && row.group==="bonds")input.addEventListener("change",render);
     return input;
   }
   function buildTable(headers,compact=false) {
@@ -136,17 +153,22 @@
     dirty=true;render();message("새 항목을 입력한 뒤 저장해 주세요.");
   }
   function render() {
+    renderedDay=todayKorea();
     $("initial-import").hidden=Boolean(data.revision);
     ["total"].forEach(group=>{
       const target=$(`${group}-accounts`);target.replaceChildren(accountTable(group,data.accounts.filter(r=>r.group===group),groups[group]));
     });
     const bonds=$("bonds-accounts");bonds.replaceChildren();
+    const completedTitle=document.createElement("h3"),waitingTitle=document.createElement("h3"),rule=document.createElement("p");
+    completedTitle.textContent="1. 이전완료";waitingTitle.textContent="2. 이전대기";
+    rule.className="hint";rule.textContent=`${renderedDay} 기준, 2026년 만기일이 오늘보다 이전인 항목을 자동 분류합니다.`;
+    bonds.append(completedTitle,rule,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds"&&bondCompleted(r)),"이전완료"),waitingTitle);
     const years=[...new Set([2025,2026,...data.accounts.filter(r=>r.group==="bonds").map(r=>r.year)])].sort();
     years.forEach(year=>{
       const section=document.createElement("section"),heading=document.createElement("div"),title=document.createElement("h3"),button=document.createElement("button"),subtotal=document.createElement("p");
       heading.className="heading";title.textContent=`${year}년`;button.className="secondary";button.textContent=`${year}년 항목 추가`;
       button.addEventListener("click",()=>addAccount("bonds",year));heading.append(title,button);subtotal.className="hint";subtotal.dataset.bondYearTotal=year;
-      section.append(heading,subtotal,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds" && r.year===year),`이전대상채권 ${year}년`));bonds.append(section);
+      section.append(heading,subtotal,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds" && r.year===year && !bondCompleted(r)),`이전대기 ${year}년`));bonds.append(section);
     });
     ["movement","future","expenses"].forEach(collection=>{
       const columnLabels=collection==="expenses"?["항목","금액총액","내용"]:collection==="movement"?["항목","금액","내용"]:["항목","금액 (원)","내용(비고)"];
@@ -162,6 +184,7 @@
     document.querySelectorAll("[data-document-field]").forEach(input=>input.value=data[input.dataset.documentField]??"");
     $("updated").textContent=data.updated_at?`최근 저장 ${new Date(data.updated_at).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})}`:"아직 등록된 내용이 없습니다.";
     totals();
+    applyEditState();
   }
   $("unlock-form").addEventListener("submit",async event=>{
     event.preventDefault();const button=event.currentTarget.querySelector("button");button.disabled=true;const current=++generation;
@@ -170,7 +193,7 @@
       token=auth.token;const result=await api("records");if(current!==generation)return;
       data=result.document||{accounts:[],other_assets:[],future:[],expenses:[],other:"",total_scope:"c1",name_colors:{}};
       $("locked").hidden=true;$("workspace").hidden=false;render();message("");deadline=Date.now()+auth.expires_in*1000;
-      const tick=()=>{const left=Math.max(0,Math.floor((deadline-Date.now())/1000));$("remaining").textContent=`${Math.floor(left/60)}분 ${left%60}초`;if(!left)lock(true);else totals();};tick();timer=setInterval(tick,1000);
+      const tick=()=>{const left=Math.max(0,Math.floor((deadline-Date.now())/1000));$("remaining").textContent=`${Math.floor(left/60)}분 ${left%60}초`;if(!left)lock(true);else if(renderedDay!==todayKorea())render();else totals();};tick();timer=setInterval(tick,1000);
     }catch(error){if(current===generation)message(error.message,true);}finally{$("password").value="";button.disabled=false;}
   });
   $("workbook-form").addEventListener("submit",async event=>{
@@ -188,14 +211,51 @@
     }catch(error){if(current===generation)message(error.message,true);}
     finally{saving=false;button.disabled=false;$("workbook-file").value="";$("blue-name").value="";$("green-name").value="";}
   });
-  $("save").addEventListener("click",async()=>{
-    if(saving||!data)return;
-    if(![...$("workspace").querySelectorAll("input,select,textarea")].every(input=>input.reportValidity()))return;
+  async function saveChanges(){
+    if(saving||!data)return false;
+    if(![...$("workspace").querySelectorAll(".asset-section input,.asset-section select,.asset-section textarea")].every(input=>input.reportValidity()))return false;
     saving=true;const current=generation;
-    $("workspace").querySelectorAll("input,select,textarea,button:not(#lock)").forEach(input=>input.disabled=true);
-    try{const result=await api("records",data.revision?"PUT":"POST",data);if(current!==generation)return;data=result.document;dirty=false;render();message("저장했습니다.");}
-    catch(error){if(current===generation)message(error.message,true);}
-    finally{saving=false;$("workspace").querySelectorAll("input,select,textarea,button").forEach(input=>input.disabled=false);}
+    applyEditState();
+    try{const result=await api("records",data.revision?"PUT":"POST",data);if(current!==generation)return false;data=result.document;dirty=false;editingSections.clear();render();message("저장했습니다.");document.querySelectorAll(".section-save-status").forEach(el=>el.textContent="모든 변경사항을 저장했습니다.");return true;}
+    catch(error){if(current===generation){message(error.message,true);document.querySelectorAll(".section-save-status").forEach(el=>el.textContent=error.message);}return false;}
+    finally{saving=false;applyEditState();}
+  }
+  $("save").addEventListener("click",saveChanges);
+  $("download-excel").addEventListener("click",async()=>{
+    if(!data||saving)return;const current=generation;
+    if((dirty||!data.revision)&&!await saveChanges())return;
+    if(current!==generation)return;
+    const button=$("download-excel");button.disabled=true;
+    try{
+      const response=await fetch("/asset-status/export",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"X-Asset-Request":"1","X-Asset-Token":token}});
+      if(!response.ok)throw new Error("엑셀 파일을 내려받지 못했습니다. 비밀번호와 저장 상태를 확인해 주세요.");
+      const blob=await response.blob();if(current!==generation)return;
+      const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`asset-status-${new Date().toISOString().slice(0,10)}.xlsx`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      message("엑셀 다운로드를 시작했습니다.");
+    }catch(error){if(current===generation)message(error.message,true);}finally{button.disabled=false;}
+  });
+  function preparePrint(){
+    document.querySelectorAll(".print-value").forEach(el=>el.remove());
+    if(!data)return;
+    document.querySelectorAll(".asset-section input,.asset-section textarea,.asset-section select").forEach(input=>{
+      const value=document.createElement("span");value.className="print-value";
+      value.textContent=input.tagName==="SELECT"?input.selectedOptions[0]?.textContent||"":input.value;
+      if(input.classList.contains("name-blue"))value.classList.add("name-blue");if(input.classList.contains("name-green"))value.classList.add("name-green");
+      input.after(value);
+    });
+  }
+  window.addEventListener("beforeprint",preparePrint);
+  window.addEventListener("afterprint",()=>document.querySelectorAll(".print-value").forEach(el=>el.remove()));
+  $("print-assets").addEventListener("click",async()=>{
+    if(!data||saving)return;if((dirty||!data.revision)&&!await saveChanges())return;if(!data)return;preparePrint();window.print();
+  });
+  document.querySelectorAll(".asset-section").forEach(section=>{
+    const footer=document.createElement("div"),edit=document.createElement("button"),button=document.createElement("button"),status=document.createElement("span");
+    footer.className="section-save";button.type="button";button.textContent="변경사항 저장";button.className="section-save-button";
+    edit.type="button";edit.className="secondary section-edit";edit.textContent="수정";
+    edit.addEventListener("click",()=>{editingSections.add(section.id);status.textContent="각 항목을 수정한 뒤 저장해 주세요. 저장 시 다른 구역의 변경사항도 함께 저장됩니다.";applyEditState();});
+    button.addEventListener("click",saveChanges);status.className="section-save-status";status.setAttribute("role","status");
+    footer.append(edit,button,status);section.append(footer);
   });
   document.querySelectorAll(".add-account").forEach(button=>button.addEventListener("click",()=>addAccount(button.dataset.group)));
   document.querySelectorAll(".add-simple").forEach(button=>button.addEventListener("click",()=>{

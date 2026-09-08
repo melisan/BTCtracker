@@ -13,7 +13,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from cryptography.fernet import Fernet, InvalidToken
-from flask import Blueprint, jsonify, make_response, render_template, request
+from flask import Blueprint, jsonify, make_response, render_template, request, send_file
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -158,7 +158,7 @@ def create_asset_blueprint(get_db, query):
                 return jsonify(error="요청 출처를 확인할 수 없습니다."), 403
         if request.content_length and request.content_length > MAX_BYTES:
             return jsonify(error="저장할 내용이 너무 큽니다."), 413
-        if request.path.endswith(("/records", "/initial-workbook")):
+        if request.path.endswith(("/records", "/initial-workbook", "/export")):
             if not authenticated(config()):
                 return jsonify(error="비밀번호를 다시 입력해 주세요."), 401
 
@@ -257,6 +257,25 @@ def create_asset_blueprint(get_db, query):
         response = jsonify(ok=True)
         response.delete_cookie("asset_session", path="/asset-status", httponly=True, samesite="Strict")
         return response
+
+    @bp.post("/export")
+    def export():
+        from asset_export import export_workbook
+        cfg = config()
+        conn = get_db()
+        try:
+            row = query(conn, "SELECT content FROM tab_notes WHERE tab = %s ORDER BY id LIMIT 1", (PRIVATE_TAB,)).fetchone()
+            if not row:
+                return jsonify(error="내용을 먼저 저장해 주세요."), 409
+            document = validate_document(json.loads(cfg[0].decrypt(row["content"].encode())))
+            today = datetime.now(ZoneInfo("Asia/Seoul"))
+            return send_file(export_workbook(document, today.date()),
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                as_attachment=True, download_name=f"asset-status-{today:%Y-%m-%d}.xlsx", max_age=0)
+        except Exception:
+            return jsonify(error="엑셀 파일을 만들지 못했습니다. 다시 시도해 주세요."), 503
+        finally:
+            conn.close()
 
     @bp.route("/records", methods=["GET", "POST", "PUT"])
     @bp.post("/initial-import")

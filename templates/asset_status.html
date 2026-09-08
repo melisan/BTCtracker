@@ -31,22 +31,23 @@
     </form>
   </section>
   <section id="workspace" hidden>
-    <section id="initial-import" class="gate" hidden>
-      <h2>엑셀 내용 처음 등록하기</h2>
-      <p>원본 엑셀을 한 번 선택해 주세요. 파일 자체는 보관하지 않고 내용을 암호화해 저장합니다. 이후에는 아래 표에서 바로 수정할 수 있습니다.</p>
+    <details id="initial-import" class="optional-import" hidden>
+      <summary>엑셀에서 가져오기 (선택)</summary>
+      <p>엑셀 없이 아래 표에 직접 입력하고 저장할 수 있습니다. 엑셀로 시작하려는 경우에만 최초 한 번 파일을 선택해 주세요.</p>
       <form id="workbook-form">
         <label for="workbook-file">전체계좌현황표 엑셀 파일</label><input id="workbook-file" type="file" accept=".xlsx" required>
         <label for="blue-name">파란색으로 표시할 이름</label><input id="blue-name" type="text" autocomplete="off" maxlength="200">
         <label for="green-name">초록색으로 표시할 이름</label><input id="green-name" type="text" autocomplete="off" maxlength="200">
         <button>엑셀 내용 등록</button>
       </form>
-    </section>
-    <div class="heading"><div><p class="eyebrow">ASSET STATUS</p><h1>자산 현황</h1><p id="updated"></p></div><button id="lock" class="secondary">잠그기</button></div>
+    </details>
+    <div class="heading"><div><p class="eyebrow">ASSET STATUS</p><h1>자산 현황</h1><p id="updated"></p></div><div class="actions"><button id="download-excel" class="secondary">엑셀 다운로드</button><button id="print-assets" class="secondary">인쇄</button><button id="lock" class="secondary">잠그기</button></div></div>
     <div class="toolbar"><div class="section-links"><a href="#section-total">전체자산</a><a href="#section-bonds">이전대상채권</a><a href="#section-movement">자금이동대상</a><a href="#section-future">미래충족금액</a><a href="#section-expenses">소모비용</a></div><button id="save">변경사항 저장</button></div>
     <section id="section-total" class="asset-section">
       <div class="overall"><span>1. 전체자산</span><strong id="overall-total" data-sensitive></strong><p>기존 합계 범위와 이 구역에 새로 추가한 자산의 원본총액을 합산합니다.</p></div>
       <div class="summary"><div><span>예·적금 원본총액</span><strong id="total" data-sensitive></strong></div><div><span>예·적금 이자</span><strong id="interest-total" data-sensitive></strong></div><div><span id="year-label"></span><strong id="due-total" data-sensitive></strong></div></div>
       <div class="heading"><h3>보유 자산</h3><button class="secondary add-account" data-group="total">자산 추가</button></div>
+      <p class="hint">아래 ‘수정’을 누른 뒤 각 칸을 편집하거나 자산을 추가하고 저장하세요. 엑셀 없이 사용할 수 있으며, 금액을 바꾸면 합계도 자동으로 계산됩니다.</p>
       <p class="hint">올해 만기인 행은 빨간색과 ‘올해 만기’로 표시됩니다. 계좌번호는 앞자리 0까지 그대로 보관합니다.</p>
       <div id="total-accounts" class="sensitive-table"></div>
     </section>
