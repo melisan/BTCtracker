@@ -106,6 +106,11 @@
       if(group==="bonds") {
         $("bonds-interest").textContent=money(interest);$("bonds-combined").textContent=money(principal+interest);
         available=principal+interest;
+        document.querySelectorAll("[data-bond-status-total]").forEach(el=>{
+          const subset=rows.filter(r=>bondCompleted(r)===(el.dataset.bondStatusTotal==="completed"));
+          const principal=sum(subset),interest=sum(subset,"interest");
+          el.textContent=`소계 ${money(principal+interest)} (이자+원금)`;
+        });
         document.querySelectorAll("[data-bond-year-total]").forEach(el=>{
           const subset=rows.filter(r=>r.year===Number(el.dataset.bondYearTotal)&&!bondCompleted(r));
           el.textContent=`원본총액 ${money(sum(subset))} · 이자 ${money(sum(subset,"interest"))}`;
@@ -195,7 +200,10 @@
     const completedTitle=document.createElement("h3"),waitingTitle=document.createElement("h3"),rule=document.createElement("p");
     completedTitle.textContent="1. 이전완료";waitingTitle.textContent="2. 이전대기";
     rule.className="hint";rule.textContent=`${renderedDay} 기준, 2026년 만기일이 오늘보다 이전인 항목을 자동 분류합니다.`;
-    bonds.append(completedTitle,rule,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds"&&bondCompleted(r)),"이전완료"),waitingTitle);
+    const completedSubtotal=document.createElement("p"),waitingSubtotal=document.createElement("p");
+    completedSubtotal.className=waitingSubtotal.className="bond-status-subtotal";
+    completedSubtotal.dataset.bondStatusTotal="completed";waitingSubtotal.dataset.bondStatusTotal="waiting";
+    bonds.append(completedTitle,completedSubtotal,rule,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds"&&bondCompleted(r)),"이전완료"),waitingTitle,waitingSubtotal);
     const years=[...new Set([2025,2026,...data.accounts.filter(r=>r.group==="bonds").map(r=>r.year)])].sort();
     years.forEach(year=>{
       const section=document.createElement("section"),heading=document.createElement("div"),title=document.createElement("h3"),button=document.createElement("button"),subtotal=document.createElement("p");
