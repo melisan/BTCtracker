@@ -259,6 +259,10 @@ function calcKRW(h) {
 
 // ── Tab switching ─────────────────────────────────────────────
 function switchTab(tab) {
+  if (tab === "asset-status") {
+    window.location.assign(`/asset-status/#${lang}`);
+    return;
+  }
   activeTab = tab;
   document.querySelectorAll(".tab-btn").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === tab));
@@ -1813,6 +1817,8 @@ async function runAnomalyFix() {
 (async () => {
   loadRetirementParams();
   setupNotesSections();
+  const requestedTab = window.location.hash.slice(1);
+  if (["us", "korean", "crypto", "krw", "history", "retirement"].includes(requestedTab)) switchTab(requestedTab);
   await fetchCryptoPrices();
   await Promise.all([fetchHoldings(), fetchHistory(), fetchStockPrices()]);
   await checkAndBackfill();

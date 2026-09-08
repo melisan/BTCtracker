@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asset status · Harvest Portfolio</title>
+  <link rel="stylesheet" href="/static/asset-status.css">
+  <script src="/static/asset-status.js" defer></script>
+</head>
+<body>
+<main>
+  <header><a class="brand" href="/">✝ Harvest Portfolio</a><span>자산을 차분하게 살펴보는 공간</span></header>
+  <nav aria-label="포트폴리오"><a href="/">🌳 Overview</a><a href="/#us">📈 US Stocks</a><a href="/#korean">🌸 Korean</a><a href="/#crypto">₿ Crypto</a><a href="/#krw">🐷 KRW</a><a href="/#history">📅 History</a><a href="/#retirement">🌾 Retirement</a><span aria-current="page">📊 Asset status</span></nav>
+  <section id="locked" class="gate">
+    <p class="eyebrow">ASSET STATUS</p><h1>자산 현황</h1>
+    <p>비밀번호를 입력하면 저장된 내용을 보고 수정할 수 있습니다.</p>
+    <form id="unlock-form" autocomplete="off">
+      <label for="password">비밀번호</label>
+      <div class="password-row"><input id="password" type="password" autocomplete="off" required maxlength="256"><button>열기</button></div>
+    </form>
+  </section>
+  <section id="workspace" hidden>
+    <div class="heading"><div><p class="eyebrow">ASSET STATUS</p><h1>자산 현황</h1><p id="updated"></p></div><button id="lock" class="secondary">잠그기</button></div>
+    <div class="toolbar"><div class="section-links"><a href="#section-total">전체자산</a><a href="#section-bonds">이전대상채권</a><a href="#section-movement">자금이동대상</a><a href="#section-future">미래충족금액</a><a href="#section-expenses">소모비용</a></div><button id="save">변경사항 저장</button></div>
+    <section id="section-total" class="asset-section">
+      <div class="overall"><span>1. 전체자산</span><strong id="overall-total" data-sensitive></strong><p>기존 합계 범위와 이 구역에 새로 추가한 자산의 원본총액을 합산합니다.</p></div>
+      <div class="summary"><div><span>예·적금 원본총액</span><strong id="total" data-sensitive></strong></div><div><span>예·적금 이자</span><strong id="interest-total" data-sensitive></strong></div><div><span id="year-label"></span><strong id="due-total" data-sensitive></strong></div></div>
+      <div class="heading"><h3>보유 자산</h3><button class="secondary add-account" data-group="total">자산 추가</button></div>
+      <p class="hint">올해 만기인 행은 빨간색과 ‘올해 만기’로 표시됩니다. 계좌번호는 앞자리 0까지 그대로 보관합니다.</p>
+      <div id="total-accounts" class="sensitive-table"></div>
+    </section>
+    <section id="section-bonds" class="asset-section">
+      <div class="heading"><h2>2. 이전대상채권</h2></div>
+      <div class="summary"><div><span>원본총액</span><strong id="bonds-principal" data-sensitive></strong></div><div><span>이자</span><strong id="bonds-interest" data-sensitive></strong></div><div><span>원본총액 + 이자</span><strong id="bonds-combined" data-sensitive></strong></div></div>
+      <div id="bonds-accounts" class="sensitive-table"></div><label for="bond_notes">내용(비고)</label><textarea id="bond_notes" class="section-note" data-document-field="bond_notes" rows="2" autocomplete="off"></textarea>
+    </section>
+    <section id="section-movement" class="asset-section">
+      <div class="heading"><h2>3. 자금이동대상</h2><button class="secondary add-account" data-group="movement">항목 추가</button></div>
+      <div class="overall small-total"><span>자금이동대상 합계</span><strong id="movement-principal" data-sensitive></strong></div>
+      <div id="movement-accounts" class="sensitive-table"></div><label for="movement_notes">내용(비고)</label><textarea id="movement_notes" class="section-note" data-document-field="movement_notes" rows="2" autocomplete="off"></textarea>
+    </section>
+    <section id="section-future" class="asset-section">
+      <div class="heading"><h2>4. 미래충족금액</h2><button class="secondary add-simple" data-collection="future">항목 추가</button></div>
+      <div id="future-rows" class="sensitive-table"></div>
+      <div class="summary"><div><span>채무청산금</span><strong id="future-total" data-sensitive></strong></div><div><span>정기예금금액총액</span><strong id="future-available" data-sensitive></strong></div><div><span>유용금액</span><strong id="future-balance" data-sensitive></strong><p class="calculation-note">※ 유용금액= 정기예금금액총액- 채무청산금</p></div></div>
+      <div class="detail-grid"><label>추가 항목<input data-document-field="future_extra_label" autocomplete="off"></label><label>추가 금액 (원)<input type="number" step="any" data-document-field="future_extra_amount" autocomplete="off"></label><label>추가 비고<textarea data-document-field="future_extra_notes" rows="2" autocomplete="off"></textarea></label></div>
+    </section>
+    <section id="section-expenses" class="asset-section">
+      <div class="heading"><h2>5. 소모비용</h2><button class="secondary add-simple" data-collection="expenses">항목 추가</button></div><div id="expenses-rows" class="sensitive-table"></div><div class="overall small-total"><span>소모비용 합계</span><strong id="expenses-total" data-sensitive></strong></div>
+    </section>
+    <p class="hint">자동 잠금까지 <span id="remaining"></span>. 수정한 내용은 잠기기 전에 저장해 주세요.</p>
+  </section>
+  <p id="message" role="status" aria-live="polite"></p>
+</main>
+<template id="account-table-template"><div class="table-wrap"><table><thead><tr><th>항목</th><th>이름</th><th>내용</th><th>계좌번호</th><th>원본총액 (원)</th><th>이자 (원)</th><th>내용(비고)</th><th>만기일</th></tr></thead><tbody></tbody></table></div></template>
+</body>
+</html>

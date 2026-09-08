@@ -9,6 +9,7 @@ import math
 import logging
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from asset_status import create_asset_blueprint, PRIVATE_TAB
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
@@ -900,6 +901,8 @@ def api_patch_snapshot():
 @app.route("/api/notes")
 def api_get_notes():
     tab  = request.args.get("tab", "").strip()
+    if tab == PRIVATE_TAB:
+        return jsonify({"error": "Not found"}), 404
     conn = get_db()
     cur  = query(conn, """
         SELECT id, tab, content, pinned, created_at
@@ -918,6 +921,8 @@ def api_get_notes():
 def api_add_note():
     data    = request.get_json() or {}
     tab     = (data.get("tab") or "").strip()
+    if tab == PRIVATE_TAB:
+        return jsonify({"error": "Not found"}), 404
     content = (data.get("content") or "").strip()
     if not tab or not content:
         return jsonify({"error": "Missing tab or content"}), 400
@@ -932,7 +937,7 @@ def api_add_note():
 @app.route("/api/notes/<int:nid>/pin", methods=["POST"])
 def api_toggle_pin(nid):
     conn = get_db()
-    cur  = query(conn, "SELECT pinned FROM tab_notes WHERE id = %s", (nid,))
+    cur  = query(conn, "SELECT pinned FROM tab_notes WHERE id = %s AND tab <> %s", (nid, PRIVATE_TAB))
     row  = cur.fetchone()
     if not row:
         conn.close()
@@ -951,7 +956,7 @@ def api_edit_note(nid):
     if not content:
         return jsonify({"error": "content required"}), 400
     conn = get_db()
-    query(conn, "UPDATE tab_notes SET content = %s WHERE id = %s", (content, nid))
+    query(conn, "UPDATE tab_notes SET content = %s WHERE id = %s AND tab <> %s", (content, nid, PRIVATE_TAB))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -960,7 +965,7 @@ def api_edit_note(nid):
 @app.route("/api/notes/<int:nid>", methods=["DELETE"])
 def api_delete_note(nid):
     conn = get_db()
-    query(conn, "DELETE FROM tab_notes WHERE id = %s", (nid,))
+    query(conn, "DELETE FROM tab_notes WHERE id = %s AND tab <> %s", (nid, PRIVATE_TAB))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1019,6 +1024,8 @@ def clean_snapshot_outliers():
     except Exception as e:
         logging.error(f"clean_snapshot_outliers failed: {e}")
 
+
+app.register_blueprint(create_asset_blueprint(get_db, query))
 
 init_db()
 clean_snapshot_outliers()
