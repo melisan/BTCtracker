@@ -241,7 +241,19 @@ class SecurityTests(unittest.TestCase):
         book=openpyxl.load_workbook(BytesIO(output.data))
         self.assertEqual(book["전체자산"]["I3"].value,"이동처")
         self.assertEqual(book["전체자산"]["I4"].value,"가상 이동처")
+        self.assertEqual(book["이전대상채권"]["K3"].value,"이전처")
+        self.assertIn("가상 이동처",[r[0] for r in book["이전대상채권"].iter_rows(min_row=4,min_col=11,max_col=11,values_only=True)])
         book.close()
+
+    def test_temporary_reserve_reduces_only_held_balance(self):
+        from asset_export import export_workbook
+        data=validate_document({**SAMPLE,"held_reserve_amount":25000})
+        book=openpyxl.load_workbook(export_workbook(data,date(2026,9,8)))
+        ws=book["전체자산"]
+        self.assertEqual(ws["B1"].value,100000)
+        self.assertEqual(ws.cell(ws.max_row,2).value,75000)
+        book.close()
+        with self.assertRaises(ValueError):validate_document({**SAMPLE,"held_reserve_amount":-1})
 
 
 if __name__ == "__main__": unittest.main()

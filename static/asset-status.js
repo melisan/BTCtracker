@@ -99,9 +99,9 @@
   function totals() {
     if(!data) return;
     const total=data.accounts.filter(r=>r.group==="total"), deposits=total.filter(r=>r.category==="예적금");
-    const overall=sum(total)+sum(data.other_assets||[]),consumed=sum(total.filter(consumedAsset));
-    $("overall-total").textContent=money(overall);$("held-total").textContent=money(overall-consumed);
-    document.querySelectorAll("[data-asset-subtotal]").forEach(el=>el.textContent=`원본총액 ${money(el.dataset.assetSubtotal==="consumed"?consumed:overall-consumed)}`);
+    const overall=sum(total)+sum(data.other_assets||[]),consumed=sum(total.filter(consumedAsset)),reserve=data.held_reserve_amount||0;
+    $("overall-total").textContent=money(overall);$("held-total").textContent=money(overall-consumed-reserve);
+    document.querySelectorAll("[data-asset-subtotal]").forEach(el=>el.textContent=`원본총액 ${money(el.dataset.assetSubtotal==="consumed"?consumed:overall-consumed)}${el.dataset.assetSubtotal==="held"?" (임시보류 차감 전)":""}`);
     $("total").textContent=money(sum(deposits)); $("interest-total").textContent=money(sum(deposits,"interest"));
     const year=yearNow(); $("year-label").textContent=`${year}년 만기 예·적금`;
     $("due-total").textContent=`${deposits.filter(r=>r.maturity && Number(r.maturity.slice(0,4))===year).length}건`;
@@ -161,17 +161,18 @@
     head.append(tr);table.append(head,body);wrap.append(table);return {wrap,body};
   }
   function accountTable(group,rows,prefix) {
-    const showDestination=group==="total"&&prefix==="이미 소비한 자산";
+    const showDestination=(group==="total"&&prefix==="이미 소비한 자산")||(group==="bonds"&&prefix==="이전완료");
+    const destinationLabel=group==="bonds"?"이전처":"이동처";
     const fs=group==="movement"?[...fields,"review_notes"]:showDestination?[...fields,"destination"]:fields;
-    const {wrap,body}=buildTable(group==="movement"?[...labels,"이동 검토 메모","관리"]:showDestination?[...labels,"이동처"]:labels);
+    const {wrap,body}=buildTable(group==="movement"?[...labels,"이동 검토 메모","관리"]:showDestination?[...labels,destinationLabel]:labels);
     const years=[...new Set([2025,2026,yearNow(),yearNow()+1,...data.accounts.filter(r=>r.group==="bonds").map(r=>r.year)])].sort();
     rows.forEach((row,index)=>{
       const tr=document.createElement("tr");tr.id=group==="bonds"?`bond-view-${row.id}`:`asset-row-${row.id}`;
       fs.forEach(field=>{
-        const td=document.createElement("td"),name=field==="year"?"연도":field==="destination"?"이동처":field==="review_notes"?"이동 검토 메모":labels[fields.indexOf(field)].replace(" (원)","");
+        const td=document.createElement("td"),name=field==="year"?"연도":field==="destination"?destinationLabel:field==="review_notes"?"이동 검토 메모":labels[fields.indexOf(field)].replace(" (원)","");
         const options=field==="year"?years:field==="category" && group==="total"?["예적금","코인","주식","금"]:null;
         const control=makeInput(row,field,`${prefix} ${index+1}행 ${name}`,options);
-        if(group==="bonds"||(group==="movement"&&row.source_id&&field!=="review_notes")){control.dataset.sourceLinked=field;control.title="전체자산에서 수정하면 함께 갱신됩니다.";}
+        if((group==="bonds"&&field!=="destination")||(group==="movement"&&row.source_id&&field!=="review_notes")){control.dataset.sourceLinked=field;control.title="전체자산에서 수정하면 함께 갱신됩니다.";}
         td.append(control);
         if(field==="maturity"){const mark=document.createElement("span");mark.className="due-mark";mark.textContent="올해 만기";td.append(mark);}
         tr.append(td);
@@ -235,7 +236,7 @@
         });body.append(tr);
       });$(collection==="movement"?"movement-accounts":`${collection}-rows`).replaceChildren(wrap);
     });
-    document.querySelectorAll("[data-document-field]").forEach(input=>input.value=data[input.dataset.documentField]??"");
+    document.querySelectorAll("[data-document-field]").forEach(input=>input.value=data[input.dataset.documentField]??(input.dataset.documentField==="held_reserve_amount"?0:""));
     $("updated").textContent=data.updated_at?`최근 저장 ${new Date(data.updated_at).toLocaleString("ko-KR",{timeZone:"Asia/Seoul"})}`:"아직 등록된 내용이 없습니다.";
     totals();
     applyEditState();

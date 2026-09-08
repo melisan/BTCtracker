@@ -51,6 +51,12 @@ def validate_document(data):
     if extra is not None and (isinstance(extra,bool) or not isinstance(extra,(int,float)) or not math.isfinite(extra) or abs(extra)>9e15):
         raise ValueError("Invalid extra amount")
     result["future_extra_amount"] = extra
+    reserve = data.get("held_reserve_amount", 0)
+    if reserve is None:
+        reserve = 0
+    if isinstance(reserve,bool) or not isinstance(reserve,(int,float)) or not math.isfinite(reserve) or not 0 <= reserve <= 9e15:
+        raise ValueError("Invalid reserve amount")
+    result["held_reserve_amount"] = reserve
     if len(result["other"]) > 100_000:
         raise ValueError("Too much text")
     ids = set()

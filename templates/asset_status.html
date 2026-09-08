@@ -45,7 +45,7 @@
     <div class="toolbar"><div class="section-links"><a href="#section-total">전체자산</a><a href="#section-bonds">이전대상채권</a><a href="#section-movement">자금이동대상</a><a href="#section-future">미래충족금액</a><a href="#section-expenses">소모비용</a></div><button id="save">변경사항 저장</button></div>
     <section id="section-total" class="asset-section">
       <div class="overall"><span>1. 전체자산 <small>(처음자산)</small></span><strong id="overall-total" data-sensitive></strong><p>이미 소비한 자산과 보유자산의 원본총액을 모두 합산합니다.</p></div>
-      <div class="overall small-total"><span>보유자산 <small>(자산현황)</small></span><strong id="held-total" data-sensitive></strong><p>전체자산 − 이미 소비한 자산</p></div>
+      <div class="overall small-total"><span>보유자산 <small>(자산현황)</small></span><strong id="held-total" data-sensitive></strong><p>전체자산 − 이미 소비한 자산 − 임시보류자산(전세금 등)</p><label for="held-reserve">임시보류 금액 (원)</label><input id="held-reserve" data-document-field="held_reserve_amount" type="number" min="0" max="9000000000000000" step="any" autocomplete="off"><p>수정을 눌러 입력하세요. 입력하지 않으면 0원으로 계산합니다.</p></div>
       <div class="summary"><div><span>예·적금 원본총액 <small>(처음관리시작금액)</small></span><strong id="total" data-sensitive></strong></div><div><span>예·적금 이자</span><strong id="interest-total" data-sensitive></strong></div><div><span id="year-label"></span><strong id="due-total" data-sensitive></strong><p class="calculation-note">전체자산 원본의 해당 연도 만기 예·적금만 집계합니다. 이미 만기가 지난 항목도 포함하며 중복 집계하지 않습니다.</p></div></div>
       <div class="heading"><h3>자산 구분</h3><button class="secondary add-account" data-group="total">자산 추가</button></div>
       <p class="hint">만기일이 2026년 6월 1일 이전인 예·적금은 ‘이미 소비한 자산’으로 구분합니다. 전체자산 합계에는 두 구역을 모두 포함합니다.</p>
