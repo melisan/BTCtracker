@@ -138,5 +138,16 @@ class SecurityTests(unittest.TestCase):
         self.unlock()
         self.assertEqual(validate_document(self.client.get("/asset-status/records",headers=self.headers).json["document"]),validate_document(SAMPLE))
 
+    def test_browser_workbook_import_requires_password_and_is_initial_only(self):
+        self.assertEqual(self.client.post("/asset-status/initial-workbook",data=b"sample",headers=self.headers).status_code,401)
+        self.unlock()
+        with patch("import_asset_status.read_document",return_value=SAMPLE) as reader:
+            response=self.client.post("/asset-status/initial-workbook",data=b"sample",headers=self.headers,content_type="application/octet-stream")
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(reader.call_args.args[0].getvalue(),b"sample")
+            reader.reset_mock()
+            self.assertEqual(self.client.post("/asset-status/initial-workbook",data=b"replacement",headers=self.headers).status_code,409)
+            reader.assert_not_called()
+
 
 if __name__ == "__main__": unittest.main()

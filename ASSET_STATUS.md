@@ -2,7 +2,10 @@
 
 The protected page is `/asset-status/`. It uses only first-party scripts and styles,
 and loads financial records only after password authentication. It has no analytics,
-third-party assets, browser storage, or workbook upload widget.
+third-party assets or browser storage. Before the first record is saved, an
+authenticated owner can select the original workbook once. The raw request body
+is parsed using BytesIO, without multipart upload spooling or saving the workbook.
+The import control disappears after initial storage and refuses overwriting.
 
 ## Configuration
 

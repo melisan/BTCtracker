@@ -7,6 +7,8 @@ import os
 import secrets
 import threading
 import time
+from io import BytesIO
+from urllib.parse import unquote
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -156,7 +158,7 @@ def create_asset_blueprint(get_db, query):
                 return jsonify(error="요청 출처를 확인할 수 없습니다."), 403
         if request.content_length and request.content_length > MAX_BYTES:
             return jsonify(error="저장할 내용이 너무 큽니다."), 413
-        if request.path.endswith("/records"):
+        if request.path.endswith(("/records", "/initial-workbook")):
             if not authenticated(config()):
                 return jsonify(error="비밀번호를 다시 입력해 주세요."), 401
 
@@ -247,6 +249,7 @@ def create_asset_blueprint(get_db, query):
 
     @bp.route("/records", methods=["GET", "POST", "PUT"])
     @bp.post("/initial-import")
+    @bp.post("/initial-workbook")
     def records():
         cfg = config()
         owner_import = request.path.endswith("/initial-import")
@@ -266,11 +269,16 @@ def create_asset_blueprint(get_db, query):
                 stored = json.loads(cfg[0].decrypt(row["content"].encode()))
             if request.method == "GET":
                 return jsonify(document=stored, year=datetime.now(ZoneInfo("Asia/Seoul")).year)
-            incoming = request.get_json(silent=True)
-            if not isinstance(incoming, dict):
-                return jsonify(error="입력 내용을 확인해 주세요."), 400
             if request.method == "POST" and stored:
                 return jsonify(error="이미 내용이 등록되어 있습니다."), 409
+            if request.path.endswith("/initial-workbook"):
+                from import_asset_status import read_document
+                colors = json.loads(unquote(request.headers.get("X-Asset-Name-Colors", "{}")))
+                incoming = read_document(BytesIO(request.get_data(cache=False)), name_colors=colors)
+            else:
+                incoming = request.get_json(silent=True)
+            if not isinstance(incoming, dict):
+                return jsonify(error="입력 내용을 확인해 주세요."), 400
             if request.method == "PUT" and (not stored or incoming.get("revision") != stored["revision"]):
                 return jsonify(error="다른 화면에서 내용이 변경되었습니다. 수정 내용을 확인한 뒤 다시 열어 주세요."), 409
             clean = validate_document(incoming)

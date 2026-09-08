@@ -26,6 +26,16 @@
     </form>
   </section>
   <section id="workspace" hidden>
+    <section id="initial-import" class="gate" hidden>
+      <h2>엑셀 내용 처음 등록하기</h2>
+      <p>원본 엑셀을 한 번 선택해 주세요. 파일 자체는 보관하지 않고 내용을 암호화해 저장합니다. 이후에는 아래 표에서 바로 수정할 수 있습니다.</p>
+      <form id="workbook-form">
+        <label for="workbook-file">전체계좌현황표 엑셀 파일</label><input id="workbook-file" type="file" accept=".xlsx" required>
+        <label for="blue-name">파란색으로 표시할 이름</label><input id="blue-name" type="text" autocomplete="off" maxlength="200">
+        <label for="green-name">초록색으로 표시할 이름</label><input id="green-name" type="text" autocomplete="off" maxlength="200">
+        <button>엑셀 내용 등록</button>
+      </form>
+    </section>
     <div class="heading"><div><p class="eyebrow">ASSET STATUS</p><h1>자산 현황</h1><p id="updated"></p></div><button id="lock" class="secondary">잠그기</button></div>
     <div class="toolbar"><div class="section-links"><a href="#section-total">전체자산</a><a href="#section-bonds">이전대상채권</a><a href="#section-movement">자금이동대상</a><a href="#section-future">미래충족금액</a><a href="#section-expenses">소모비용</a></div><button id="save">변경사항 저장</button></div>
     <section id="section-total" class="asset-section">

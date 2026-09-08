@@ -41,6 +41,7 @@
     document.querySelectorAll("[data-sensitive]").forEach(el=>el.textContent="");
     document.querySelectorAll("[data-document-field]").forEach(el=>el.value="");
     $("updated").textContent=""; $("password").value="";
+    ["new-password","confirm-password","workbook-file","blue-name","green-name"].forEach(id=>$(id).value="");
     $("workspace").hidden=true; $("locked").hidden=false;
   }
   async function lock(automatic=false) {
@@ -128,6 +129,7 @@
     dirty=true;render();message("새 항목을 입력한 뒤 저장해 주세요.");
   }
   function render() {
+    $("initial-import").hidden=Boolean(data.revision);
     ["total"].forEach(group=>{
       const target=$(`${group}-accounts`);target.replaceChildren(accountTable(group,data.accounts.filter(r=>r.group===group),groups[group]));
     });
@@ -163,6 +165,21 @@
       $("locked").hidden=true;$("workspace").hidden=false;render();message("");deadline=Date.now()+auth.expires_in*1000;
       const tick=()=>{const left=Math.max(0,Math.floor((deadline-Date.now())/1000));$("remaining").textContent=`${Math.floor(left/60)}분 ${left%60}초`;if(!left)lock(true);else totals();};tick();timer=setInterval(tick,1000);
     }catch(error){if(current===generation)message(error.message,true);}finally{$("password").value="";button.disabled=false;}
+  });
+  $("workbook-form").addEventListener("submit",async event=>{
+    event.preventDefault(); if(saving || !data || data.revision)return;
+    const file=$("workbook-file").files[0]; if(!file)return;
+    if(file.size>1000000){message("파일은 1MB 이하만 등록할 수 있습니다.",true);return;}
+    const colors={}; if($("blue-name").value.trim())colors[$("blue-name").value.trim()]="blue";
+    if($("green-name").value.trim())colors[$("green-name").value.trim()]="green";
+    saving=true;const current=generation;const button=event.submitter;button.disabled=true;
+    try {
+      const response=await fetch("/asset-status/initial-workbook",{method:"POST",credentials:"same-origin",cache:"no-store",
+        headers:{"Content-Type":"application/octet-stream","X-Asset-Request":"1","X-Asset-Token":token,"X-Asset-Name-Colors":encodeURIComponent(JSON.stringify(colors))},body:file});
+      const result=await response.json();if(!response.ok)throw new Error(result.error||"파일을 등록하지 못했습니다.");
+      if(current!==generation)return;data=result.document;dirty=false;render();message("엑셀 내용을 등록했습니다. 이제 이 화면에서 수정하고 저장할 수 있습니다.");
+    }catch(error){if(current===generation)message(error.message,true);}
+    finally{saving=false;button.disabled=false;$("workbook-file").value="";$("blue-name").value="";$("green-name").value="";}
   });
   $("save").addEventListener("click",async()=>{
     if(saving||!data)return;
