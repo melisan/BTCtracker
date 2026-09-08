@@ -58,7 +58,7 @@ def validate_document(data):
         if not isinstance(row, dict):
             raise ValueError("Invalid row")
         clean = {}
-        for field in ("id", "category", "name", "description", "account", "notes", "maturity"):
+        for field in ("id", "category", "name", "description", "account", "notes", "maturity", "source_id", "review_notes"):
             value = row.get(field, "")
             if not isinstance(value, str) or len(value) > 4000:
                 raise ValueError("Invalid text")
@@ -87,6 +87,16 @@ def validate_document(data):
         if clean["maturity"]:
             clean["maturity"] = date.fromisoformat(clean["maturity"]).isoformat()
         result["accounts"].append(clean)
+    sources = {r["id"]:r for r in result["accounts"] if r["group"] == "total"}
+    linked = set()
+    for row in result["accounts"]:
+        if row["source_id"]:
+            source = sources.get(row["source_id"])
+            if row["group"] != "movement" or not source or row["source_id"] in linked:
+                raise ValueError("Invalid source asset")
+            linked.add(row["source_id"])
+            for field in ("category", "name", "description", "account", "amount", "interest", "notes", "maturity"):
+                row[field] = source[field]
     for collection in ("other_assets", "future", "expenses"):
         items = data.get(collection, [])
         if not isinstance(items,list) or len(items)>1000:

@@ -189,5 +189,21 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(statuses,["이전완료"]+["이전대기"]*4)
         book.close()
 
+    def test_linked_movement_uses_source_without_changing_total_or_review(self):
+        sample=copy.deepcopy(SAMPLE)
+        linked=copy.deepcopy(sample["accounts"][0]);linked.update(id="move-linked",group="movement",source_id="sample-1",amount=1,review_notes="가상 검토 메모")
+        sample["accounts"].append(linked)
+        clean=validate_document(sample)
+        self.assertEqual(clean["accounts"][1]["amount"],100000)
+        self.assertEqual(clean["accounts"][1]["review_notes"],"가상 검토 메모")
+        sample["accounts"][0]["amount"]=250000
+        clean=validate_document(sample)
+        self.assertEqual(clean["accounts"][1]["amount"],250000)
+        self.assertEqual(sum(r["amount"] for r in clean["accounts"] if r["group"]=="total"),250000)
+        broken=copy.deepcopy(sample);broken["accounts"][1]["source_id"]="missing"
+        with self.assertRaises(ValueError):validate_document(broken)
+        duplicate=copy.deepcopy(linked);duplicate["id"]="duplicate";sample["accounts"].append(duplicate)
+        with self.assertRaises(ValueError):validate_document(sample)
+
 
 if __name__ == "__main__": unittest.main()

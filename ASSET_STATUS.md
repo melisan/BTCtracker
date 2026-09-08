@@ -68,6 +68,12 @@ strings to text cells. Print replaces controls with text only for the print layo
 2026 maturities before the current Korean date appear under completed bonds;
 remaining bonds appear under waiting, grouped by year. Export uses the same rule.
 
+Movement candidates can reference an overall asset by `source_id`. Validation
+copies source fields, rejects missing/duplicate references, and preserves a separate
+review note. Movement references never enter the overall total. Existing rows link
+only on a unique exact category/name/account/description/maturity match; unmatched
+rows remain editable. Amount fields show thousands separators outside editing.
+
 Run `python -m unittest -v test_asset_status` and JavaScript syntax checks. Browser
 verification uses synthetic data only. Check password denial, lock/unlock, save and
 reload, category choices, year regrouping, additions to all editable sections,

@@ -65,7 +65,7 @@ def export_workbook(data, today):
             if isinstance(c.value,str): c.data_type="s"
     completed = lambda r: bool(r.get("maturity", "").startswith("2026-") and r["maturity"] < today.isoformat())
     sheet("이전대상채권", ["상태","연도"]+headers, [["이전완료" if completed(r) else "이전대기",r["year"]]+account_values(r) for r in sorted(bonds,key=lambda r:(not completed(r),r["year"]))], amount(bonds)+amount(bonds,"interest"), data.get("bond_notes", ""))
-    sheet("자금이동대상", ["항목","금액","내용"], [[r["description"],r["amount"],r["notes"]] for r in movement], amount(movement), data.get("movement_notes", ""))
+    sheet("자금이동대상", headers+["이동 검토 메모","연결"], [account_values(r)+[r.get("review_notes",""),"보유자산 연결" if r.get("source_id") else "직접 입력"] for r in movement], amount(movement), data.get("movement_notes", ""))
     future = data.get("future", [])
     available = amount(bonds)+amount(bonds,"interest")
     future_rows = [[r["description"],r["amount"],r["notes"]] for r in future]

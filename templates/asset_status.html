@@ -57,7 +57,9 @@
       <div id="bonds-accounts" class="sensitive-table"></div><label for="bond_notes">내용(비고)</label><textarea id="bond_notes" class="section-note" data-document-field="bond_notes" rows="2" autocomplete="off"></textarea>
     </section>
     <section id="section-movement" class="asset-section">
-      <div class="heading"><h2>3. 자금이동대상</h2><button class="secondary add-account" data-group="movement">항목 추가</button></div>
+      <div class="heading"><h2>3. 자금이동대상</h2><button class="secondary add-account" data-group="movement">직접 항목 추가</button></div>
+      <p class="hint">수정을 누르고 보유자산에서 이동을 고려 중인 자산을 선택하세요. 연결된 항목은 보유자산의 수정 내용을 반영하며, 전체자산에 중복 합산되지 않습니다.</p>
+      <label for="movement-source">보유자산에서 선택</label><div class="actions"><select id="movement-source"></select><button id="add-movement-source" type="button">이동대상에 추가</button></div>
       <div class="overall small-total"><span>자금이동대상 합계</span><strong id="movement-principal" data-sensitive></strong></div>
       <div id="movement-accounts" class="sensitive-table"></div><label for="movement_notes">내용(비고)</label><textarea id="movement_notes" class="section-note" data-document-field="movement_notes" rows="2" autocomplete="off"></textarea>
     </section>
