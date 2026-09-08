@@ -210,7 +210,7 @@
     completedSubtotal.className=waitingSubtotal.className="bond-status-subtotal";
     completedSubtotal.dataset.bondStatusTotal="completed";waitingSubtotal.dataset.bondStatusTotal="waiting";
     bonds.append(completedTitle,completedSubtotal,rule,accountTable("bonds",bondRows().filter(bondCompleted),"이전완료"),waitingTitle,waitingSubtotal);
-    const pendingRows=bondRows().filter(bondWaiting);
+    const pendingRows=bondRows().filter(bondWaiting).sort((a,b)=>a.maturity.localeCompare(b.maturity));
     const years=[...new Set(pendingRows.map(r=>Number(r.maturity.slice(0,4))))].sort();
     years.forEach(year=>{
       const section=document.createElement("section"),heading=document.createElement("div"),title=document.createElement("h3"),subtotal=document.createElement("p");
