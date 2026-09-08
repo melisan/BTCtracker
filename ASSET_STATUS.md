@@ -65,8 +65,12 @@ commits the entire document with revision protection and returns sections to rea
 mode. Manual saves never validate the optional workbook picker. Export requires
 authentication, streams a five-sheet XLSX from memory, and forces user-entered
 strings to text cells. Print replaces controls with text only for the print layout.
-2026 maturities before the current Korean date appear under completed bonds;
-remaining bonds appear under waiting, grouped by year. Export uses the same rule.
+All overall deposit rows are the canonical bond view; legacy independent bond rows
+remain stored but are not counted again. Maturities before the current Korean date
+appear under completed; strictly later dates appear under waiting, grouped by actual
+maturity year. Today and missing dates appear separately for date review. Status
+subtotals include principal plus interest. Annual maturity counts also use only the
+canonical overall deposit rows. Export uses the same rules.
 
 Movement candidates can reference an overall asset by `source_id`. Validation
 copies source fields, rejects missing/duplicate references, and preserves a separate

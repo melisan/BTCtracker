@@ -58,7 +58,7 @@ def validate_document(data):
         if not isinstance(row, dict):
             raise ValueError("Invalid row")
         clean = {}
-        for field in ("id", "category", "name", "description", "account", "notes", "maturity", "source_id", "review_notes"):
+        for field in ("id", "category", "name", "description", "account", "notes", "maturity", "source_id", "review_notes", "destination"):
             value = row.get(field, "")
             if not isinstance(value, str) or len(value) > 4000:
                 raise ValueError("Invalid text")

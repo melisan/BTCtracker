@@ -44,7 +44,9 @@
   const money = n => new Intl.NumberFormat("ko-KR",{maximumFractionDigits:2}).format(n)+"원";
   const yearNow = () => Number(new Intl.DateTimeFormat("en",{timeZone:"Asia/Seoul",year:"numeric"}).format(new Date()));
   const todayKorea = () => {const parts=new Intl.DateTimeFormat("en",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());return ["year","month","day"].map(type=>parts.find(p=>p.type===type).value).join("-");};
-  const bondCompleted = row => Boolean(row.maturity?.startsWith("2026-") && row.maturity<todayKorea());
+  const bondCompleted = row => Boolean(row.maturity && row.maturity<todayKorea());
+  const bondWaiting = row => Boolean(row.maturity && row.maturity>todayKorea());
+  const bondRows = () => data.accounts.filter(r=>r.group==="total"&&r.category==="예적금");
   const consumedAsset = row => row.group==="total" && row.category==="예적금" && Boolean(row.maturity && row.maturity<"2026-06-01");
   let renderedDay="";
   const sum = (rows,field="amount") => rows.reduce((n,r) => n+(r[field] ?? 0),0);
@@ -59,6 +61,10 @@
         if(field==="name")applyNameColor(control,control.value);
       });
     });
+    bondRows().forEach(row=>document.getElementById(`bond-view-${row.id}`)?.querySelectorAll("[data-source-linked]").forEach(control=>{
+      const field=control.dataset.sourceLinked;control.value=["amount","interest"].includes(field)?(row[field]==null?"":new Intl.NumberFormat("ko-KR",{maximumFractionDigits:20}).format(row[field])):row[field]??"";
+      if(field==="name")applyNameColor(control,control.value);
+    }));
   }
   function changed() { dirty=true; syncMovement();totals(); document.querySelectorAll(".section-save-status").forEach(el=>el.textContent="");message("수정한 내용이 있습니다. 변경사항을 저장해 주세요."); }
   async function api(path,method="GET",body) {
@@ -97,22 +103,22 @@
     $("overall-total").textContent=money(overall);$("held-total").textContent=money(overall-consumed);
     document.querySelectorAll("[data-asset-subtotal]").forEach(el=>el.textContent=`원본총액 ${money(el.dataset.assetSubtotal==="consumed"?consumed:overall-consumed)}`);
     $("total").textContent=money(sum(deposits)); $("interest-total").textContent=money(sum(deposits,"interest"));
-    const year=yearNow(); $("year-label").textContent=`${year}년 만기 (전체자산·채권)`;
-    $("due-total").textContent=`${data.accounts.filter(r=>r.group!=="movement" && r.maturity && Number(r.maturity.slice(0,4))===year).length}건`;
+    const year=yearNow(); $("year-label").textContent=`${year}년 만기 예·적금`;
+    $("due-total").textContent=`${deposits.filter(r=>r.maturity && Number(r.maturity.slice(0,4))===year).length}건`;
     let available=0;
     ["bonds","movement"].forEach(group=>{
-      const rows=data.accounts.filter(r=>r.group===group), principal=sum(rows), interest=sum(rows,"interest");
+      const rows=group==="bonds"?bondRows():data.accounts.filter(r=>r.group===group), principal=sum(rows), interest=sum(rows,"interest");
       $(`${group}-principal`).textContent=money(principal);
       if(group==="bonds") {
         $("bonds-interest").textContent=money(interest);$("bonds-combined").textContent=money(principal+interest);
         available=principal+interest;
         document.querySelectorAll("[data-bond-status-total]").forEach(el=>{
-          const subset=rows.filter(r=>bondCompleted(r)===(el.dataset.bondStatusTotal==="completed"));
+          const subset=rows.filter(el.dataset.bondStatusTotal==="completed"?bondCompleted:bondWaiting);
           const principal=sum(subset),interest=sum(subset,"interest");
           el.textContent=`소계 ${money(principal+interest)} (이자+원금)`;
         });
         document.querySelectorAll("[data-bond-year-total]").forEach(el=>{
-          const subset=rows.filter(r=>r.year===Number(el.dataset.bondYearTotal)&&!bondCompleted(r));
+          const subset=rows.filter(r=>Number(r.maturity?.slice(0,4))===Number(el.dataset.bondYearTotal)&&bondWaiting(r));
           el.textContent=`원본총액 ${money(sum(subset))} · 이자 ${money(sum(subset,"interest"))}`;
         });
       }
@@ -121,9 +127,8 @@
     $("future-total").textContent=money(needed); $("future-available").textContent=money(available);
     $("future-balance").textContent=money(available-needed); $("expenses-total").textContent=money(sum(data.expenses));
     data.accounts.forEach(row=>{
-      const tr=document.getElementById(`asset-row-${row.id}`); if(!tr) return;
       const due=!!row.maturity && Number(row.maturity.slice(0,4))===year;
-      tr.classList.toggle("due",due); const mark=tr.querySelector(".due-mark");if(mark)mark.hidden=!due;
+      [`asset-row-${row.id}`,`bond-view-${row.id}`].forEach(id=>{const tr=document.getElementById(id);if(!tr)return;tr.classList.toggle("due",due);const mark=tr.querySelector(".due-mark");if(mark)mark.hidden=!due;});
     });
   }
   function makeInput(row,field,label,options=null) {
@@ -144,7 +149,7 @@
       if(field==="name") applyNameColor(input,input.value);
       changed(); if(field==="year") render();
     });
-    if(formattedMoney)input.addEventListener("blur",()=>{if(input.validity.valid)formatMoney();});
+    if(formattedMoney){input.addEventListener("focus",()=>input.select());input.addEventListener("blur",()=>{if(input.validity.valid)formatMoney();});}
     if((field==="maturity" && ["bonds","total"].includes(row.group)) || (field==="category" && row.group==="total"))input.addEventListener("change",render);
     return input;
   }
@@ -156,16 +161,17 @@
     head.append(tr);table.append(head,body);wrap.append(table);return {wrap,body};
   }
   function accountTable(group,rows,prefix) {
-    const hasYear=group==="bonds", fs=hasYear?["year",...fields]:group==="movement"?[...fields,"review_notes"]:fields;
-    const {wrap,body}=buildTable(hasYear?["연도",...labels]:group==="movement"?[...labels,"이동 검토 메모","관리"]:labels);
+    const showDestination=group==="total"&&prefix==="이미 소비한 자산";
+    const fs=group==="movement"?[...fields,"review_notes"]:showDestination?[...fields,"destination"]:fields;
+    const {wrap,body}=buildTable(group==="movement"?[...labels,"이동 검토 메모","관리"]:showDestination?[...labels,"이동처"]:labels);
     const years=[...new Set([2025,2026,yearNow(),yearNow()+1,...data.accounts.filter(r=>r.group==="bonds").map(r=>r.year)])].sort();
     rows.forEach((row,index)=>{
-      const tr=document.createElement("tr");tr.id=`asset-row-${row.id}`;
+      const tr=document.createElement("tr");tr.id=group==="bonds"?`bond-view-${row.id}`:`asset-row-${row.id}`;
       fs.forEach(field=>{
-        const td=document.createElement("td"),name=field==="year"?"연도":field==="review_notes"?"이동 검토 메모":labels[fields.indexOf(field)].replace(" (원)","");
+        const td=document.createElement("td"),name=field==="year"?"연도":field==="destination"?"이동처":field==="review_notes"?"이동 검토 메모":labels[fields.indexOf(field)].replace(" (원)","");
         const options=field==="year"?years:field==="category" && group==="total"?["예적금","코인","주식","금"]:null;
         const control=makeInput(row,field,`${prefix} ${index+1}행 ${name}`,options);
-        if(group==="movement"&&row.source_id&&field!=="review_notes"){control.dataset.sourceLinked=field;control.title="보유자산에서 수정하면 함께 갱신됩니다.";}
+        if(group==="bonds"||(group==="movement"&&row.source_id&&field!=="review_notes")){control.dataset.sourceLinked=field;control.title="전체자산에서 수정하면 함께 갱신됩니다.";}
         td.append(control);
         if(field==="maturity"){const mark=document.createElement("span");mark.className="due-mark";mark.textContent="올해 만기";td.append(mark);}
         tr.append(td);
@@ -199,18 +205,21 @@
     const bonds=$("bonds-accounts");bonds.replaceChildren();
     const completedTitle=document.createElement("h3"),waitingTitle=document.createElement("h3"),rule=document.createElement("p");
     completedTitle.textContent="1. 이전완료";waitingTitle.textContent="2. 이전대기";
-    rule.className="hint";rule.textContent=`${renderedDay} 기준, 2026년 만기일이 오늘보다 이전인 항목을 자동 분류합니다.`;
+    rule.className="hint";rule.textContent=`${renderedDay} 기준, 지난 만기일은 이전완료, 오늘 이후 만기일은 이전대기로 구분합니다. 동일 항목은 중복 표시하지 않습니다.`;
     const completedSubtotal=document.createElement("p"),waitingSubtotal=document.createElement("p");
     completedSubtotal.className=waitingSubtotal.className="bond-status-subtotal";
     completedSubtotal.dataset.bondStatusTotal="completed";waitingSubtotal.dataset.bondStatusTotal="waiting";
-    bonds.append(completedTitle,completedSubtotal,rule,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds"&&bondCompleted(r)),"이전완료"),waitingTitle,waitingSubtotal);
-    const years=[...new Set([2025,2026,...data.accounts.filter(r=>r.group==="bonds").map(r=>r.year)])].sort();
+    bonds.append(completedTitle,completedSubtotal,rule,accountTable("bonds",bondRows().filter(bondCompleted),"이전완료"),waitingTitle,waitingSubtotal);
+    const pendingRows=bondRows().filter(bondWaiting);
+    const years=[...new Set(pendingRows.map(r=>Number(r.maturity.slice(0,4))))].sort();
     years.forEach(year=>{
-      const section=document.createElement("section"),heading=document.createElement("div"),title=document.createElement("h3"),button=document.createElement("button"),subtotal=document.createElement("p");
-      heading.className="heading";title.textContent=`${year}년`;button.className="secondary";button.textContent=`${year}년 항목 추가`;
-      button.addEventListener("click",()=>addAccount("bonds",year));heading.append(title,button);subtotal.className="hint";subtotal.dataset.bondYearTotal=year;
-      section.append(heading,subtotal,accountTable("bonds",data.accounts.filter(r=>r.group==="bonds" && r.year===year && !bondCompleted(r)),`이전대기 ${year}년`));bonds.append(section);
+      const section=document.createElement("section"),heading=document.createElement("div"),title=document.createElement("h3"),subtotal=document.createElement("p");
+      heading.className="heading";title.textContent=`${year}년`;heading.append(title);subtotal.className="hint";subtotal.dataset.bondYearTotal=year;
+      section.append(heading,subtotal,accountTable("bonds",pendingRows.filter(r=>Number(r.maturity.slice(0,4))===year),`이전대기 ${year}년`));bonds.append(section);
     });
+    if(!pendingRows.length){const empty=document.createElement("p");empty.textContent="오늘 이후 만기인 이전대기 항목이 없습니다.";bonds.append(empty);}
+    const dateCheck=bondRows().filter(r=>!bondCompleted(r)&&!bondWaiting(r));
+    if(dateCheck.length){const title=document.createElement("h3");title.textContent="날짜 확인 필요 (오늘 만기·만기일 미입력)";bonds.append(title,accountTable("bonds",dateCheck,"날짜 확인 필요"));}
     $("movement-accounts").replaceChildren(accountTable("movement",data.accounts.filter(r=>r.group==="movement"),"자금이동대상"));
     const sourcePicker=$("movement-source");sourcePicker.replaceChildren();const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="보유자산을 선택하세요";sourcePicker.append(placeholder);
     const selectedSources=new Set(data.accounts.filter(r=>r.group==="movement").map(r=>r.source_id));
@@ -272,6 +281,7 @@
     finally{saving=false;applyEditState();}
   }
   $("save").addEventListener("click",saveChanges);
+  $("add-bond-source").addEventListener("click",()=>{if(!data||saving)return;editingSections.add("section-total");addAccount("total");$("section-total").scrollIntoView({behavior:"smooth"});});
   $("add-movement-source").addEventListener("click",()=>{
     if(!data||saving)return;const source=data.accounts.find(r=>r.group==="total"&&r.id===$("movement-source").value);if(!source)return;
     if(data.accounts.some(r=>r.group==="movement"&&r.source_id===source.id))return;

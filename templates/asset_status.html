@@ -46,7 +46,7 @@
     <section id="section-total" class="asset-section">
       <div class="overall"><span>1. 전체자산 <small>(처음자산)</small></span><strong id="overall-total" data-sensitive></strong><p>이미 소비한 자산과 보유자산의 원본총액을 모두 합산합니다.</p></div>
       <div class="overall small-total"><span>보유자산 <small>(자산현황)</small></span><strong id="held-total" data-sensitive></strong><p>전체자산 − 이미 소비한 자산</p></div>
-      <div class="summary"><div><span>예·적금 원본총액</span><strong id="total" data-sensitive></strong></div><div><span>예·적금 이자</span><strong id="interest-total" data-sensitive></strong></div><div><span id="year-label"></span><strong id="due-total" data-sensitive></strong></div></div>
+      <div class="summary"><div><span>예·적금 원본총액 <small>(처음관리시작금액)</small></span><strong id="total" data-sensitive></strong></div><div><span>예·적금 이자</span><strong id="interest-total" data-sensitive></strong></div><div><span id="year-label"></span><strong id="due-total" data-sensitive></strong><p class="calculation-note">전체자산 원본의 해당 연도 만기 예·적금만 집계합니다. 이미 만기가 지난 항목도 포함하며 중복 집계하지 않습니다.</p></div></div>
       <div class="heading"><h3>자산 구분</h3><button class="secondary add-account" data-group="total">자산 추가</button></div>
       <p class="hint">만기일이 2026년 6월 1일 이전인 예·적금은 ‘이미 소비한 자산’으로 구분합니다. 전체자산 합계에는 두 구역을 모두 포함합니다.</p>
       <p class="hint">아래 ‘수정’을 누른 뒤 각 칸을 편집하거나 자산을 추가하고 저장하세요. 엑셀 없이 사용할 수 있으며, 금액을 바꾸면 합계도 자동으로 계산됩니다.</p>
@@ -54,7 +54,8 @@
       <div id="total-accounts" class="sensitive-table"></div>
     </section>
     <section id="section-bonds" class="asset-section">
-      <div class="heading"><h2>2. 이전대상채권</h2></div>
+      <div class="heading"><h2>2. 이전대상채권</h2><button class="secondary" id="add-bond-source" type="button">전체자산에 예·적금 추가</button></div>
+      <p class="hint">전체자산의 모든 예·적금을 원본에서 한 번씩 가져옵니다. 금액·내용·만기일은 <a href="#section-total">전체자산</a>에서 수정하면 함께 반영됩니다.</p>
       <div class="summary"><div><span>원본총액</span><strong id="bonds-principal" data-sensitive></strong></div><div><span>이자</span><strong id="bonds-interest" data-sensitive></strong></div><div><span>원본총액 + 이자</span><strong id="bonds-combined" data-sensitive></strong></div></div>
       <div id="bonds-accounts" class="sensitive-table"></div><label for="bond_notes">내용(비고)</label><textarea id="bond_notes" class="section-note" data-document-field="bond_notes" rows="2" autocomplete="off"></textarea>
     </section>

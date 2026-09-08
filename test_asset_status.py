@@ -181,12 +181,18 @@ class SecurityTests(unittest.TestCase):
     def test_export_bond_completion_date_boundary(self):
         from asset_export import export_workbook
         data=validate_document(SAMPLE)
+        template=copy.deepcopy(data["accounts"][0]);data["accounts"]=[]
         for i, maturity in enumerate(("2026-09-07","2026-09-08","2026-09-09","2025-01-01","")):
-            row=copy.deepcopy(data["accounts"][0]);row.update(id=f"bond-{i}",group="bonds",year=2026,maturity=maturity)
+            row=copy.deepcopy(template);row.update(id=f"owned-{i}",group="total",year=None,maturity=maturity)
             data["accounts"].append(row)
+        legacy=copy.deepcopy(template);legacy.update(id="legacy-copy",group="bonds",year=2026)
+        data["accounts"].append(legacy)
         book=openpyxl.load_workbook(export_workbook(data,date(2026,9,8)))
         statuses=[book["이전대상채권"].cell(r,1).value for r in range(4,9)]
-        self.assertEqual(statuses,["이전완료"]+["이전대기"]*4)
+        self.assertEqual(statuses.count("이전완료"),2)
+        self.assertEqual(statuses.count("이전대기"),1)
+        self.assertEqual(statuses.count("날짜 확인 필요"),2)
+        self.assertEqual(book["이전대상채권"]["B1"].value,5*(100000+1234))
         book.close()
 
     def test_linked_movement_uses_source_without_changing_total_or_review(self):
@@ -215,9 +221,26 @@ class SecurityTests(unittest.TestCase):
         book=openpyxl.load_workbook(export_workbook(data,date(2026,9,8)))
         ws=book["전체자산"]
         self.assertEqual(ws["B1"].value,300000)
-        self.assertEqual([ws.cell(r,9).value for r in range(4,7)],["이미 소비한 자산","보유자산","보유자산"])
+        self.assertEqual([ws.cell(r,10).value for r in range(4,7)],["이미 소비한 자산","보유자산","보유자산"])
         self.assertEqual(ws.cell(ws.max_row,1).value,"보유자산 (자산현황)")
         self.assertEqual(ws.cell(ws.max_row,2).value,200000)
+        book.close()
+
+    def test_independent_amount_and_destination_roundtrip(self):
+        sample=copy.deepcopy(SAMPLE)
+        second=copy.deepcopy(sample["accounts"][0]);second.update(id="independent",amount=222000)
+        sample["accounts"].append(second)
+        sample["accounts"][0].update(amount=111000,destination="가상 이동처",maturity="2026-05-31")
+        self.unlock()
+        saved=self.client.post("/asset-status/records",json=sample,headers=self.headers)
+        self.assertEqual(saved.status_code,200)
+        rows=self.client.get("/asset-status/records",headers=self.headers).json["document"]["accounts"]
+        self.assertEqual([r["amount"] for r in rows],[111000,222000])
+        self.assertEqual(rows[0]["destination"],"가상 이동처")
+        output=self.client.post("/asset-status/export",headers=self.headers)
+        book=openpyxl.load_workbook(BytesIO(output.data))
+        self.assertEqual(book["전체자산"]["I3"].value,"이동처")
+        self.assertEqual(book["전체자산"]["I4"].value,"가상 이동처")
         book.close()
 
 

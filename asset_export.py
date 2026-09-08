@@ -54,12 +54,13 @@ def export_workbook(data, today):
     rows_for = lambda group: [r for r in accounts if r["group"] == group]
     amount = lambda rows, field="amount": sum(r.get(field) or 0 for r in rows)
     total, bonds, movement = (rows_for(g) for g in ("total", "bonds", "movement"))
+    bonds = [r for r in total if r["category"] == "예적금"]
     fields = ["category", "name", "description", "account", "amount", "interest", "notes", "maturity"]
     headers = ["항목", "이름", "내용", "계좌번호", "원본총액", "이자", "내용(비고)", "만기일"]
     def account_values(row):
         return [date.fromisoformat(row[f]) if f == "maturity" and row.get(f) else row.get(f) for f in fields]
     consumed = lambda r: r["category"] == "예적금" and bool(r.get("maturity") and r["maturity"] < "2026-06-01")
-    ws = sheet("전체자산", headers+["구분"], [account_values(r)+["이미 소비한 자산" if consumed(r) else "보유자산"] for r in sorted(total,key=lambda r:not consumed(r))], amount(total)+amount(data.get("other_assets", [])), "2026년 6월 1일 이전 만기 예·적금을 구분하며, 전체자산 합계에는 두 구역을 모두 포함합니다.")
+    ws = sheet("전체자산", headers+["이동처","구분"], [account_values(r)+[r.get("destination",""),"이미 소비한 자산" if consumed(r) else "보유자산"] for r in sorted(total,key=lambda r:not consumed(r))], amount(total)+amount(data.get("other_assets", [])), "2026년 6월 1일 이전 만기 예·적금을 구분하며, 전체자산 합계에는 두 구역을 모두 포함합니다.")
     for r in data.get("other_assets", []):
         ws.append(["기타", "", r["description"], "", r["amount"], None, r["notes"]])
         for c in ws[ws.max_row]:
@@ -69,8 +70,12 @@ def export_workbook(data, today):
     spent = amount([r for r in total if consumed(r)])
     for label, value in (("전체자산 (처음자산)",overall),("이미 소비한 자산",spent),("보유자산 (자산현황)",overall-spent)):
         ws.append([label,value]);ws.cell(ws.max_row,2).number_format='#,##0.00'
-    completed = lambda r: bool(r.get("maturity", "").startswith("2026-") and r["maturity"] < today.isoformat())
-    sheet("이전대상채권", ["상태","연도"]+headers, [["이전완료" if completed(r) else "이전대기",r["year"]]+account_values(r) for r in sorted(bonds,key=lambda r:(not completed(r),r["year"]))], amount(bonds)+amount(bonds,"interest"), data.get("bond_notes", ""))
+    status = lambda r: "이전완료" if r.get("maturity") and r["maturity"] < today.isoformat() else "이전대기" if r.get("maturity") and r["maturity"] > today.isoformat() else "날짜 확인 필요"
+    bond_sheet=sheet("이전대상채권", ["상태","만기연도"]+headers, [[status(r),int(r["maturity"][:4]) if r.get("maturity") else None]+account_values(r) for r in sorted(bonds,key=lambda r:(status(r),r.get("maturity","")))], amount(bonds)+amount(bonds,"interest"), data.get("bond_notes", ""))
+    for label in ("이전완료","이전대기"):
+        subset=[r for r in bonds if status(r)==label]
+        bond_sheet.append([label+" 소계 (이자+원금)",amount(subset)+amount(subset,"interest")])
+        bond_sheet.cell(bond_sheet.max_row,2).number_format='#,##0.00'
     sheet("자금이동대상", headers+["이동 검토 메모","연결"], [account_values(r)+[r.get("review_notes",""),"보유자산 연결" if r.get("source_id") else "직접 입력"] for r in movement], amount(movement), data.get("movement_notes", ""))
     future = data.get("future", [])
     available = amount(bonds)+amount(bonds,"interest")
