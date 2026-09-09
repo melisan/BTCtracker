@@ -72,7 +72,7 @@ def export_workbook(data, today):
     for label, value in (("전체자산 (처음자산)",overall),("이미 소비한 자산",spent),("임시보류자산(전세금 등)",reserve),("보유자산 (자산현황)",overall-spent-reserve)):
         ws.append([label,value]);ws.cell(ws.max_row,2).number_format='#,##0.00'
     status = lambda r: "이전완료" if r.get("maturity") and r["maturity"] < today.isoformat() else "이전대기" if r.get("maturity") and r["maturity"] > today.isoformat() else "날짜 확인 필요"
-    bond_sheet=sheet("이전대상채권", ["상태","만기연도"]+headers+["이전처"], [[status(r),int(r["maturity"][:4]) if r.get("maturity") else None]+account_values(r)+[r.get("destination","")] for r in sorted(bonds,key=lambda r:(status(r),r.get("maturity","")))], amount(bonds)+amount(bonds,"interest"), data.get("bond_notes", ""))
+    bond_sheet=sheet("현재 자산 현황", ["상태","만기연도"]+headers+["이전처"], [[status(r),int(r["maturity"][:4]) if r.get("maturity") else None]+account_values(r)+[r.get("destination","")] for r in sorted(bonds,key=lambda r:(status(r),r.get("maturity","")))], amount(bonds)+amount(bonds,"interest"), data.get("bond_notes", ""))
     for label in ("이전완료","이전대기"):
         subset=[r for r in bonds if status(r)==label]
         bond_sheet.append([label+" 소계 (이자+원금)",amount(subset)+amount(subset,"interest")])

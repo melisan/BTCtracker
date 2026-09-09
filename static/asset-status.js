@@ -25,7 +25,7 @@
     } catch(error){message(error.message,true);}
     finally {$("new-password").value="";$("confirm-password").value="";button.disabled=false;}
   });
-  const groups = {total:"전체자산",bonds:"이전대상채권",movement:"자금이동대상"};
+  const groups = {total:"전체자산",bonds:"현재 자산 현황",movement:"자금이동대상"};
   const fields = ["category","name","description","account","amount","interest","notes","maturity"];
   const labels = ["항목","이름","내용","계좌번호","원본총액 (원)","이자 (원)","내용(비고)","만기일"];
   let data = null, token = "", dirty = false, saving = false, timer = null, deadline = 0, generation = 0;

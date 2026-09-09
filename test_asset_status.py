@@ -172,7 +172,7 @@ class SecurityTests(unittest.TestCase):
         self.assertIn("attachment",response.headers["Content-Disposition"])
         self.assertIn("no-store",response.headers["Cache-Control"])
         book=openpyxl.load_workbook(BytesIO(response.data))
-        self.assertEqual(book.sheetnames,["전체자산","이전대상채권","자금이동대상","미래충족금액","소모비용"])
+        self.assertEqual(book.sheetnames,["전체자산","현재 자산 현황","자금이동대상","미래충족금액","소모비용"])
         self.assertEqual(book["전체자산"]["C4"].data_type,"s")
         self.assertEqual(book["전체자산"]["D4"].value,"001-000-000")
         self.assertEqual(book["전체자산"]["E4"].value,100000)
@@ -188,11 +188,11 @@ class SecurityTests(unittest.TestCase):
         legacy=copy.deepcopy(template);legacy.update(id="legacy-copy",group="bonds",year=2026)
         data["accounts"].append(legacy)
         book=openpyxl.load_workbook(export_workbook(data,date(2026,9,8)))
-        statuses=[book["이전대상채권"].cell(r,1).value for r in range(4,9)]
+        statuses=[book["현재 자산 현황"].cell(r,1).value for r in range(4,9)]
         self.assertEqual(statuses.count("이전완료"),2)
         self.assertEqual(statuses.count("이전대기"),1)
         self.assertEqual(statuses.count("날짜 확인 필요"),2)
-        self.assertEqual(book["이전대상채권"]["B1"].value,5*(100000+1234))
+        self.assertEqual(book["현재 자산 현황"]["B1"].value,5*(100000+1234))
         book.close()
 
     def test_linked_movement_uses_source_without_changing_total_or_review(self):
@@ -241,8 +241,8 @@ class SecurityTests(unittest.TestCase):
         book=openpyxl.load_workbook(BytesIO(output.data))
         self.assertEqual(book["전체자산"]["I3"].value,"이동처")
         self.assertEqual(book["전체자산"]["I4"].value,"가상 이동처")
-        self.assertEqual(book["이전대상채권"]["K3"].value,"이전처")
-        self.assertIn("가상 이동처",[r[0] for r in book["이전대상채권"].iter_rows(min_row=4,min_col=11,max_col=11,values_only=True)])
+        self.assertEqual(book["현재 자산 현황"]["K3"].value,"이전처")
+        self.assertIn("가상 이동처",[r[0] for r in book["현재 자산 현황"].iter_rows(min_row=4,min_col=11,max_col=11,values_only=True)])
         book.close()
 
     def test_temporary_reserve_reduces_only_held_balance(self):
