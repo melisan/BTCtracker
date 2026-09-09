@@ -76,6 +76,7 @@
     return result;
   }
   function clear() {
+    closePrintPreview();
     generation++; data=null; token=""; dirty=false; clearInterval(timer); timer=null;
     editingSections.clear();
     document.querySelectorAll(".print-value").forEach(el=>el.remove());
@@ -313,8 +314,43 @@
   }
   window.addEventListener("beforeprint",preparePrint);
   window.addEventListener("afterprint",()=>document.querySelectorAll(".print-value").forEach(el=>el.remove()));
-  $("print-assets").addEventListener("click",async()=>{
-    if(!data||saving)return;if((dirty||!data.revision)&&!await saveChanges())return;if(!data)return;preparePrint();window.print();
+  function closePrintPreview(){
+    $("print-preview").close();
+    $("print-preview-content").replaceChildren();
+    document.body.classList.remove("print-preview-open");
+  }
+  $("print-preview").addEventListener("close",closePrintPreview);
+  $("close-print-preview").addEventListener("click",closePrintPreview);
+  $("print-assets").addEventListener("click",()=>{
+    if(!data)return;
+    const report=$("print-preview-content");report.replaceChildren();
+    $("workspace").querySelectorAll(".asset-section").forEach(section=>{
+      const clone=section.cloneNode(true);
+      const originals=section.querySelectorAll("input,textarea,select");
+      clone.querySelectorAll("input,textarea,select").forEach((control,index)=>{
+        const source=originals[index],value=document.createElement("span");
+        value.className="report-value";
+        value.textContent=source.tagName==="SELECT"?source.selectedOptions[0]?.textContent||"":source.value;
+        ["name-blue","name-green"].forEach(name=>{if(source.classList.contains(name))value.classList.add(name);});
+        control.replaceWith(value);
+      });
+      clone.querySelectorAll("button,.section-save,.actions,.hint,.print-value,label[for='movement-source']").forEach(el=>el.remove());
+      [clone,...clone.querySelectorAll("*")].forEach(el=>{
+        el.removeAttribute("id");el.removeAttribute("for");
+        [...el.attributes].filter(attr=>attr.name.startsWith("data-")).forEach(attr=>el.removeAttribute(attr.name));
+      });
+      clone.classList.replace("asset-section","print-section");report.append(clone);
+    });
+    $("print-preview-note").textContent=dirty?"현재 화면의 수정 내용을 포함합니다. 앱에 보관하려면 미리보기를 닫고 변경사항을 저장해 주세요.":"현재 화면의 자산 현황입니다.";
+    document.body.classList.add("print-preview-open");$("print-preview").showModal();
+  });
+  $("open-print-dialog").addEventListener("click",()=>{if(data)window.print();});
+  $("download-print-file").addEventListener("click",()=>{
+    if(!data)return;
+    const style="body{font-family:system-ui,sans-serif;color:#111;margin:24px}table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px}th,td{border:1px solid #aaa;padding:5px;vertical-align:top;overflow-wrap:anywhere}h2,h3{break-after:avoid}tr{break-inside:avoid}.report-value{display:block;white-space:pre-wrap;overflow-wrap:anywhere}.print-section{margin-bottom:28px}.summary{display:flex;gap:24px;margin:16px 0}.summary strong,.overall strong{display:block}.name-blue{color:#165bb0}.name-green{color:#147b3c}.due-mark{color:#b00000}.calculation-note,small{font-size:11px;color:#666}@page{size:A4 landscape;margin:10mm}@media print{body{margin:0}}";
+    const html='<!doctype html><html lang="ko"><meta charset="utf-8"><title>자산 현황 인쇄</title><style>'+style+'</style><body><h1>자산 현황</h1>'+$("print-preview-content").innerHTML+'</body></html>';
+    const url=URL.createObjectURL(new Blob([html],{type:"text/html;charset=utf-8"}));
+    const link=document.createElement("a");link.href=url;link.download=`asset-status-print-${todayKorea()}.html`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   document.querySelectorAll(".asset-section").forEach(section=>{
     const footer=document.createElement("div"),edit=document.createElement("button"),button=document.createElement("button"),status=document.createElement("span");

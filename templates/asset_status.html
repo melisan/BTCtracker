@@ -79,6 +79,15 @@
   </section>
   <p id="message" role="status" aria-live="polite"></p>
 </main>
+<dialog id="print-preview" aria-labelledby="print-preview-title">
+  <div class="print-controls">
+    <h2 id="print-preview-title">인쇄 미리보기</h2>
+    <p id="print-preview-note"></p>
+    <p>인쇄 창이 열리지 않으면 ‘인쇄용 파일 다운로드’를 누른 뒤, 받은 파일을 Safari 또는 Chrome에서 열고 ⌘P(Windows: Ctrl+P)를 누르세요. 다운로드한 파일에는 자산 정보가 포함됩니다.</p>
+    <div class="print-buttons"><button id="open-print-dialog" type="button">인쇄 창 열기</button><button id="download-print-file" type="button">인쇄용 파일 다운로드</button><button id="close-print-preview" type="button">닫기</button></div>
+  </div>
+  <div id="print-preview-content"></div>
+</dialog>
 <template id="account-table-template"><div class="table-wrap"><table><thead><tr><th>항목</th><th>이름</th><th>내용</th><th>계좌번호</th><th>원본총액 (원)</th><th>이자 (원)</th><th>내용(비고)</th><th>만기일</th></tr></thead><tbody></tbody></table></div></template>
 </body>
 </html>
