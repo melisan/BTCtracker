@@ -86,7 +86,10 @@ def export_workbook(data, today):
         future_rows.append([data.get("future_extra_label",""),data.get("future_extra_amount"),data.get("future_extra_notes","")])
     sheet("미래충족금액", ["항목","금액","내용"], future_rows, amount(future), data.get("future_balance_notes", ""))
     expenses = data.get("expenses", [])
-    sheet("소모비용", ["항목","금액총액","내용"], [[r["description"],r["amount"],r["notes"]] for r in expenses], amount(expenses), data.get("other", ""))
+    expense_sheet = sheet("소모비용", ["항목","금액총액","내용"], [[r["description"],r["amount"],r["notes"]] for r in expenses], amount(expenses), data.get("other", ""))
+    for label, years in (("소모비용 연간합계", 1), ("5년 합계", 5), ("10년 합계", 10)):
+        expense_sheet.append([label, amount(expenses)*years, "현재 연간합계 기준"] )
+        expense_sheet.cell(expense_sheet.max_row, 2).number_format = '#,##0.00'
     output = BytesIO()
     book.save(output)
     book.close()

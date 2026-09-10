@@ -126,7 +126,10 @@
     });
     const needed=sum(data.future);
     $("future-total").textContent=money(needed); $("future-available").textContent=money(available);
-    $("future-balance").textContent=money(available-needed); $("expenses-total").textContent=money(sum(data.expenses));
+    $("future-balance").textContent=money(available-needed); const annualExpenses=sum(data.expenses);
+    $("expenses-total").textContent=money(annualExpenses);
+    $("expenses-five-year").textContent=money(annualExpenses*5);
+    $("expenses-ten-year").textContent=money(annualExpenses*10);
     data.accounts.forEach(row=>{
       const due=!!row.maturity && Number(row.maturity.slice(0,4))===year;
       [`asset-row-${row.id}`,`bond-view-${row.id}`].forEach(id=>{const tr=document.getElementById(id);if(!tr)return;tr.classList.toggle("due",due);const mark=tr.querySelector(".due-mark");if(mark)mark.hidden=!due;});
