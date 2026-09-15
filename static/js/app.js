@@ -40,6 +40,7 @@ let lang = "en";
 
 const STRINGS = {
   en: {
+    range_since: "Since May 1, 2026", range_recent: "Recent",
     tab_total: "🌳 Overview",   tab_us: "📈 US Stocks",
     tab_korean: "🌸 Korean",    tab_crypto: "₿ Crypto",    tab_krw: "🐷 KRW",
     tab_history: "📅 History",  tab_retirement: "🌾 Retirement",
@@ -47,8 +48,8 @@ const STRINGS = {
     scard_total: "Total Harvest",  scard_btc: "₿ Bitcoin",  scard_eth: "Ξ Ethereum",
     scard_us: "📈 US Stocks",   scard_korean: "🌸 Korean",  scard_krw: "🐷 KRW Cash",
     chart_alloc: "Harvest Allocation",  chart_growth: "Growth Over Time 🌳",
-    chart_us_perf: "30-Day Price Performance 📈",
-    chart_crypto_perf: "30-Day Crypto Performance ₿",
+    chart_us_perf: "Price Performance 📈",
+    chart_crypto_perf: "Crypto Performance ₿",
     h2_us: "My US Holdings 🌿",   h2_korean: "My Korean Holdings 🌸",
     h2_crypto: "My Crypto Holdings ₿",  h2_krw: "My KRW Holdings 🐷",
     th_label: "Label",  th_shares: "Shares",   th_usd_val: "USD Value",
@@ -64,7 +65,7 @@ const STRINGS = {
     empty_us_chart: "Add US stock holdings to see price charts.",
     empty_crypto_chart: "Add crypto holdings to see price chart.",
     empty_korean_chart: "Add Korean stock holdings to see price chart.",
-    chart_korean_perf: "30-Day Korean Stock Performance 🌸",
+    chart_korean_perf: "Korean Stock Performance 🌸",
     chart_history: "Weekly Portfolio Value 📅",
     h2_history: "Weekly Snapshots",
     lbl_seed: "Base Investment",
@@ -106,6 +107,7 @@ const STRINGS = {
     btn_fix_anomalies: "🔧 Fix Price Anomalies",
   },
   ko: {
+    range_since: "2026-05-01부터", range_recent: "최근",
     tab_total: "🌳 개요",         tab_us: "📈 미국 주식",
     tab_korean: "🌸 한국 주식",   tab_crypto: "₿ 암호화폐",  tab_krw: "🐷 원화",
     tab_history: "📅 이력",       tab_retirement: "🌾 은퇴",
@@ -113,8 +115,8 @@ const STRINGS = {
     scard_total: "총 자산",       scard_btc: "₿ 비트코인",   scard_eth: "Ξ 이더리움",
     scard_us: "📈 미국 주식",     scard_korean: "🌸 한국 주식", scard_krw: "🐷 원화 현금",
     chart_alloc: "자산 배분",     chart_growth: "성장 추이 🌳",
-    chart_us_perf: "30일 미국 주식 추이 📈",
-    chart_crypto_perf: "30일 암호화폐 추이 ₿",
+    chart_us_perf: "미국 주식 추이 📈",
+    chart_crypto_perf: "암호화폐 추이 ₿",
     h2_us: "미국 주식 보유 🌿",   h2_korean: "한국 주식 보유 🌸",
     h2_crypto: "암호화폐 보유 ₿", h2_krw: "원화 보유 🐷",
     th_label: "라벨",   th_shares: "주수",     th_usd_val: "달러 가치",
@@ -130,7 +132,7 @@ const STRINGS = {
     empty_us_chart: "미국 주식을 추가하면 가격 차트가 표시됩니다.",
     empty_crypto_chart: "암호화폐를 추가하면 가격 차트가 표시됩니다.",
     empty_korean_chart: "한국 주식을 추가하면 가격 차트가 표시됩니다.",
-    chart_korean_perf: "30일 한국 주식 추이 🌸",
+    chart_korean_perf: "한국 주식 추이 🌸",
     chart_history: "주간 포트폴리오 가치 📅",
     h2_history: "주간 스냅샷",
     lbl_seed: "기준 투자금",
@@ -200,6 +202,8 @@ let koreanStocksChart = null;
 let historyChart      = null;
 let activeTab       = "total";
 let activeRange     = "daily";
+const trackerPeriods = { total: "since", us: "since", korean: "since", crypto: "since" };
+let historyRequest = 0;
 let normalizeMode   = false;
 let historyData     = [];
 let usHistoryData   = {};
@@ -504,10 +508,14 @@ function renderLineChart(data) {
 }
 
 async function fetchHistory() {
+  const requestId = ++historyRequest;
+  const range = trackerPeriods.total === "since" ? "since" : activeRange;
   try {
-    const res = await fetch(`/api/portfolio/history?range=${activeRange}`);
+    const res = await fetch(`/api/portfolio/history?range=${range}`);
+    if (!res.ok) throw new Error("History request failed");
     const raw = await res.json();
-    historyData = raw.length > 1 ? raw.slice(0, -1) : raw;
+    if (requestId !== historyRequest) return;
+    historyData = range === "since" ? raw : (raw.length > 1 ? raw.slice(0, -1) : raw);
     renderLineChart(historyData);
   } catch (err) { console.error("History fetch failed:", err); }
 }
@@ -518,6 +526,26 @@ document.querySelectorAll(".range-btn[data-range]").forEach(btn => {
     btn.classList.add("active");
     activeRange = btn.dataset.range;
     fetchHistory();
+  });
+});
+
+document.querySelectorAll("[data-period-group]").forEach(group => {
+  group.querySelectorAll("[data-period]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tab = group.dataset.periodGroup;
+      trackerPeriods[tab] = btn.dataset.period;
+      group.querySelectorAll("[data-period]").forEach(b => {
+        const selected = b === btn;
+        b.classList.toggle("active", selected);
+        b.setAttribute("aria-pressed", String(selected));
+      });
+      if (tab === "total") {
+        document.getElementById("overview-recent-ranges").classList.toggle("hidden", btn.dataset.period !== "recent");
+        fetchHistory();
+      } else {
+        renderActiveTab();
+      }
+    });
   });
 });
 
@@ -682,32 +710,41 @@ const STOCK_COLORS = [
   "#79c0ff","#56d364","#ffa657","#ff6b6b","#f0883e",
 ];
 
+const stockHistoryPending = {};
 async function fetchUSHistory() {
-  try {
-    const res = await fetch("/api/stocks/history");
-    usHistoryData = await res.json();
-    renderUSStocksChart();
-    renderCryptoHistChart();
-    renderKoreanStocksChart();
-  } catch (err) { console.error("US history fetch failed:", err); }
+  const period = trackerPeriods[activeTab] || "since";
+  if (stockHistoryPending[period]) return stockHistoryPending[period];
+  stockHistoryPending[period] = (async () => {
+    try {
+      const res = await fetch(`/api/stocks/history?range=${period}`);
+      if (!res.ok) throw new Error("Price history request failed");
+      usHistoryData[period] = await res.json();
+      renderUSStocksChart();
+      renderCryptoHistChart();
+      renderKoreanStocksChart();
+    } catch (err) { console.error("US history fetch failed:", err); }
+    finally { delete stockHistoryPending[period]; }
+  })();
+  return stockHistoryPending[period];
 }
 
 function renderUSStocksChart() {
+  const data = usHistoryData[trackerPeriods.us] || {};
   const canvas = document.getElementById("us-stocks-chart");
   const empty  = document.getElementById("us-chart-empty");
   if (!canvas) return;
   const S = STRINGS[lang];
   const tickers = [...new Set(holdings.filter(h => isUSStock(h.asset_type)).map(h => h.asset_type))];
-  if (!tickers.length || !Object.keys(usHistoryData).length) {
+  if (!tickers.length || !Object.keys(data).length) {
     canvas.classList.add("hidden"); empty.classList.remove("hidden"); empty.textContent = S.empty_us_chart; return;
   }
-  const allDates = [...new Set(tickers.flatMap(t => Object.keys(usHistoryData[t] || {})))].sort();
+  const allDates = [...new Set(tickers.flatMap(t => Object.keys(data[t] || {})))].sort();
   if (!allDates.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
   canvas.classList.remove("hidden"); empty.classList.add("hidden");
 
   let usIdx = 0;
   const datasets = tickers.map(t => {
-    const prices = usHistoryData[t] || {};
+    const prices = data[t] || {};
     const vals   = allDates.map(d => prices[d] ?? null);
     const first  = vals.find(v => v != null) || 1;
     const color  = STOCK_COLORS[usIdx++ % STOCK_COLORS.length];
@@ -736,20 +773,21 @@ function renderUSStocksChart() {
 const CRYPTO_COLORS = { BTC: "#f7931a", ETH: "#627eea" };
 
 function renderCryptoHistChart() {
+  const data = usHistoryData[trackerPeriods.crypto] || {};
   const canvas = document.getElementById("crypto-price-chart");
   const empty  = document.getElementById("crypto-chart-empty");
   if (!canvas) return;
   const S = STRINGS[lang];
   const tickers = [...new Set(holdings.filter(h => h.asset_type === "BTC" || h.asset_type === "ETH").map(h => h.asset_type))];
-  if (!tickers.length || !Object.keys(usHistoryData).length) {
+  if (!tickers.length || !Object.keys(data).length) {
     canvas.classList.add("hidden"); empty.classList.remove("hidden"); empty.textContent = S.empty_crypto_chart; return;
   }
-  const allDates = [...new Set(tickers.flatMap(t => Object.keys(usHistoryData[t] || {})))].sort();
+  const allDates = [...new Set(tickers.flatMap(t => Object.keys(data[t] || {})))].sort();
   if (!allDates.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
   canvas.classList.remove("hidden"); empty.classList.add("hidden");
 
   const datasets = tickers.map(t => {
-    const prices = usHistoryData[t] || {};
+    const prices = data[t] || {};
     const vals   = allDates.map(d => prices[d] ?? null);
     const first  = vals.find(v => v != null) || 1;
     return { label: t, data: vals.map(v => v != null ? parseFloat((v / first * 100).toFixed(2)) : null),
@@ -777,20 +815,21 @@ function renderCryptoHistChart() {
 const KOSPI_COLORS = { "005930.KS": "#ff6b6b", "000660.KS": "#79c0ff" };
 
 function renderKoreanStocksChart() {
+  const data = usHistoryData[trackerPeriods.korean] || {};
   const canvas = document.getElementById("korean-stocks-chart");
   const empty  = document.getElementById("korean-chart-empty");
   if (!canvas) return;
   const S = STRINGS[lang];
   const tickers = [...new Set(holdings.filter(h => isKorean(h.asset_type)).map(h => h.asset_type))];
-  if (!tickers.length || !Object.keys(usHistoryData).length) {
+  if (!tickers.length || !Object.keys(data).length) {
     canvas.classList.add("hidden"); empty.classList.remove("hidden"); empty.textContent = S.empty_korean_chart; return;
   }
-  const allDates = [...new Set(tickers.flatMap(t => Object.keys(usHistoryData[t] || {})))].sort();
+  const allDates = [...new Set(tickers.flatMap(t => Object.keys(data[t] || {})))].sort();
   if (!allDates.length) { canvas.classList.add("hidden"); empty.classList.remove("hidden"); return; }
   canvas.classList.remove("hidden"); empty.classList.add("hidden");
 
   const datasets = tickers.map(t => {
-    const prices = usHistoryData[t] || {};
+    const prices = data[t] || {};
     const vals   = allDates.map(d => prices[d] ?? null);
     const first  = vals.find(v => v != null) || 1;
     return { label: KOSPI_BADGE[t] || t,
@@ -845,7 +884,7 @@ function renderUSTab() {
   document.getElementById("us-usd-krw").textContent = fmtKRW.format(usd_krw);
   setLockBtn("us-lock-btn");
   document.getElementById("us-add-btn")?.classList.toggle("hidden", !editMode);
-  if (!Object.keys(usHistoryData).length) fetchUSHistory(); else renderUSStocksChart();
+  if (!usHistoryData[trackerPeriods.us]) fetchUSHistory(); else renderUSStocksChart();
 
   const usH   = holdings.filter(h => isUSStock(h.asset_type));
   let total   = 0;
@@ -871,7 +910,7 @@ function renderKoreanTab() {
   const S = STRINGS[lang];
   setLockBtn("korean-lock-btn");
   document.getElementById("korean-add-btn")?.classList.toggle("hidden", !editMode);
-  if (!Object.keys(usHistoryData).length) fetchUSHistory(); else renderKoreanStocksChart();
+  if (!usHistoryData[trackerPeriods.korean]) fetchUSHistory(); else renderKoreanStocksChart();
 
   const kH    = holdings.filter(h => isKorean(h.asset_type));
   let total   = 0;
@@ -899,7 +938,7 @@ function renderCryptoTab() {
   document.getElementById("crypto-ts").textContent = "Updated " + new Date().toLocaleTimeString();
   setLockBtn("crypto-lock-btn");
   document.getElementById("crypto-add-btn")?.classList.toggle("hidden", !editMode);
-  if (!Object.keys(usHistoryData).length) fetchUSHistory(); else renderCryptoHistChart();
+  if (!usHistoryData[trackerPeriods.crypto]) fetchUSHistory(); else renderCryptoHistChart();
 
   const cH    = holdings.filter(h => h.asset_type === "BTC" || h.asset_type === "ETH");
   let total   = 0;

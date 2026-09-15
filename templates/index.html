@@ -88,9 +88,15 @@
         <div class="card-header">
           <h2 data-i18n="chart_growth">Growth Over Time 🌳</h2>
           <div class="chart-controls">
-            <div class="range-btns">
+            <div class="range-btns" data-period-group="total">
+              <button class="range-btn active" data-period="since" aria-pressed="true" data-i18n="range_since">Since May 1, 2026</button>
+              <button class="range-btn" data-period="recent" aria-pressed="false" data-i18n="range_recent">Recent</button>
+            </div>
+            <div class="range-btns hidden" id="overview-recent-ranges">
               <button class="range-btn active" data-range="daily">30D</button>
               <button class="range-btn" data-range="weekly">52W</button>
+            </div>
+            <div class="range-btns">
               <button id="normalize-btn" class="range-btn norm-btn">Indexed</button>
             </div>
             <div class="chart-toggles">
@@ -122,7 +128,13 @@
     </div>
 
     <div class="card">
-      <h2 data-i18n="chart_us_perf">30-Day Price Performance 📈</h2>
+      <div class="card-header tracker-header">
+        <h2 data-i18n="chart_us_perf">Price Performance 📈</h2>
+        <div class="range-btns" data-period-group="us">
+          <button class="range-btn active" data-period="since" aria-pressed="true" data-i18n="range_since">Since May 1, 2026</button>
+          <button class="range-btn" data-period="recent" aria-pressed="false" data-i18n="range_recent">Recent</button>
+        </div>
+      </div>
       <div class="us-chart-wrap">
         <div id="us-chart-empty" class="chart-empty" data-i18n="empty_us_chart">Add US stock holdings to see price charts.</div>
         <canvas id="us-stocks-chart" class="hidden"></canvas>
@@ -161,7 +173,13 @@
     </div>
 
     <div class="card">
-      <h2 data-i18n="chart_korean_perf">30-Day Korean Stock Performance 🌸</h2>
+      <div class="card-header tracker-header">
+        <h2 data-i18n="chart_korean_perf">Korean Stock Performance 🌸</h2>
+        <div class="range-btns" data-period-group="korean">
+          <button class="range-btn active" data-period="since" aria-pressed="true" data-i18n="range_since">Since May 1, 2026</button>
+          <button class="range-btn" data-period="recent" aria-pressed="false" data-i18n="range_recent">Recent</button>
+        </div>
+      </div>
       <div class="korean-chart-wrap">
         <div id="korean-chart-empty" class="chart-empty" data-i18n="empty_korean_chart">Add Korean stock holdings to see price chart.</div>
         <canvas id="korean-stocks-chart" class="hidden"></canvas>
@@ -208,7 +226,13 @@
     </div>
 
     <div class="card">
-      <h2 data-i18n="chart_crypto_perf">30-Day Crypto Performance ₿</h2>
+      <div class="card-header tracker-header">
+        <h2 data-i18n="chart_crypto_perf">Crypto Performance ₿</h2>
+        <div class="range-btns" data-period-group="crypto">
+          <button class="range-btn active" data-period="since" aria-pressed="true" data-i18n="range_since">Since May 1, 2026</button>
+          <button class="range-btn" data-period="recent" aria-pressed="false" data-i18n="range_recent">Recent</button>
+        </div>
+      </div>
       <div class="crypto-chart-wrap">
         <div id="crypto-chart-empty" class="chart-empty" data-i18n="empty_crypto_chart">Add crypto holdings to see price chart.</div>
         <canvas id="crypto-price-chart" class="hidden"></canvas>

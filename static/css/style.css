@@ -195,7 +195,8 @@ h1 { font-family: 'Lora', Georgia, serif; font-size: 1.35rem; font-weight: 700; 
   align-items: flex-end;
   gap: 0.4rem;
 }
-.range-btns { display: flex; gap: 0.3rem; }
+.range-btns { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tracker-header { flex-wrap: wrap; gap: 0.6rem; }
 .range-btn {
   background: transparent;
   border: 1px solid #30363d;

@@ -44,7 +44,8 @@ def get_held_stock_tickers():
 
 _price_cache        = {"data": None, "date": None}
 _stock_cache        = {"data": None, "ts": 0}
-_stock_hist_cache   = {"data": None, "ts": 0}
+_stock_hist_cache   = {}
+TRACKER_START_DATE = "2026-05-01"
 STOCK_TTL      = 300
 STOCK_HIST_TTL = 3600
 
@@ -412,9 +413,11 @@ def api_stocks():
 
 @app.route("/api/stocks/history")
 def api_stocks_history():
+    range_type = "since" if request.args.get("range") == "since" else "recent"
     now = time.time()
-    if _stock_hist_cache["data"] and now - _stock_hist_cache["ts"] < STOCK_HIST_TTL:
-        return jsonify(_stock_hist_cache["data"])
+    cached = _stock_hist_cache.get(range_type)
+    if cached and now - cached["ts"] < STOCK_HIST_TTL:
+        return jsonify(cached["data"])
     us_tickers, kor_tickers = get_held_stock_tickers()
     # app key → yfinance ticker (crypto needs -USD suffix)
     yf_map = {t: t for t in us_tickers + kor_tickers}
@@ -423,7 +426,8 @@ def api_stocks_history():
     result = {}
     def fetch_one(app_key, yf_ticker):
         import yfinance as yf
-        hist = yf.Ticker(yf_ticker).history(period="35d", interval="1d")
+        options = {"start": TRACKER_START_DATE} if range_type == "since" else {"period": "35d"}
+        hist = yf.Ticker(yf_ticker).history(interval="1d", **options)
         return app_key, finite_close_history(hist)
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures = {ex.submit(fetch_one, k, v): k for k, v in yf_map.items()}
@@ -433,8 +437,7 @@ def api_stocks_history():
                 result[k] = prices
             except Exception:
                 result[futures[f]] = {}
-    _stock_hist_cache["data"] = result
-    _stock_hist_cache["ts"]   = now
+    _stock_hist_cache[range_type] = {"data": result, "ts": now}
     return jsonify(result)
 
 
@@ -462,7 +465,7 @@ def api_add_holding():
 
     # Invalidate price/history caches so new ticker gets fetched immediately
     _stock_cache["ts"]      = 0
-    _stock_hist_cache["ts"] = 0
+    _stock_hist_cache.clear()
 
     conn = get_db()
     try:
@@ -547,7 +550,10 @@ def api_portfolio_history():
     all_rows = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
 
-    if range_type == "weekly":
+    if range_type == "since":
+        today = datetime.utcnow().date().isoformat()
+        rows = [r for r in all_rows if TRACKER_START_DATE <= r["date"] <= today]
+    elif range_type == "weekly":
         weeks = {}
         for r in all_rows:
             try:
