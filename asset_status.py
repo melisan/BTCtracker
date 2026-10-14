@@ -7,6 +7,7 @@ import os
 import secrets
 import threading
 import time
+from pathlib import Path
 from io import BytesIO
 from urllib.parse import unquote
 from datetime import date, datetime
@@ -25,6 +26,26 @@ MAX_BYTES = 1_000_000
 
 def setup_capability():
     return hmac.new(os.environ["ASSET_STATUS_KEY"].encode(), b"asset-status-owner-setup", hashlib.sha256).hexdigest()
+
+
+def recovery_digest(code, auth):
+    """Verify a short-lived, owner-issued 256-bit code; never persist its plaintext."""
+    if not isinstance(code, str) or not 32 <= len(code) <= 128 or not auth:
+        return None
+    try:
+        ticket = json.loads(Path(__file__).with_name("asset_recovery.json").read_text())
+        digest = hashlib.sha256(code.encode()).hexdigest()
+        expected = ticket["sha256"]
+        if (not isinstance(expected, str) or len(expected) != 64
+                or not isinstance(ticket["expires_at"], (int, float))
+                or not math.isfinite(ticket["expires_at"])
+                or time.time() >= ticket["expires_at"]
+                or digest in auth.get("used_recovery_codes", [])
+                or not hmac.compare_digest(digest, expected)):
+            return None
+        return digest
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def validate_document(data):
@@ -273,6 +294,44 @@ def create_asset_blueprint(get_db, query):
         response = jsonify(ok=True)
         response.delete_cookie("asset_session", path="/asset-status", httponly=True, samesite="Strict")
         return response
+
+    @bp.post("/recover")
+    def recover():
+        cfg = config()
+        if not cfg or not cfg[2]:
+            return jsonify(error="비밀번호 복구를 준비할 수 없습니다. 소유자 설정을 확인해 주세요."), 503
+        data = request.get_json(silent=True)
+        code = data.get("code") if isinstance(data, dict) else None
+        password = data.get("password") if isinstance(data, dict) else None
+        if not recovery_digest(code, cfg[2]):
+            return jsonify(error="복구 코드가 올바르지 않거나 이미 사용되었거나 만료되었습니다."), 403
+        if not isinstance(password, str) or not 12 <= len(password) <= 256:
+            return jsonify(error="비밀번호는 12자 이상 256자 이하로 입력해 주세요."), 400
+        conn = get_db()
+        try:
+            # Recheck under the same lock used by setup and record writes so the
+            # recovery code cannot be consumed twice by concurrent workers.
+            query(conn, "SELECT pg_advisory_xact_lock(731902841)")
+            row = query(conn, "SELECT id, content FROM tab_notes WHERE tab = %s ORDER BY id LIMIT 1", (AUTH_TAB,)).fetchone()
+            auth = json.loads(cfg[0].decrypt(row["content"].encode())) if row else None
+            digest = recovery_digest(code, auth)
+            if not digest:
+                return jsonify(error="복구 코드가 올바르지 않거나 이미 사용되었거나 만료되었습니다."), 403
+            auth["hash"] = generate_password_hash(password)
+            auth["id"] = secrets.token_hex(32)  # Invalidate every previous session.
+            auth["used_recovery_codes"] = [*auth.get("used_recovery_codes", []), digest]
+            encrypted = cfg[0].encrypt(json.dumps(auth).encode()).decode()
+            query(conn, "UPDATE tab_notes SET content = %s WHERE id = %s", (encrypted, row["id"]))
+            conn.commit()
+            with mutex:
+                attempts.clear()
+            response = jsonify(ok=True)
+            response.delete_cookie("asset_session", path="/asset-status", httponly=True, samesite="Strict")
+            return response
+        except Exception:
+            return jsonify(error="비밀번호를 재설정하지 못했습니다. 다시 시도해 주세요."), 503
+        finally:
+            conn.close()
 
     @bp.post("/export")
     def export():

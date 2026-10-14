@@ -1,6 +1,9 @@
 import copy
 import ast
 import os
+import json
+import hashlib
+import time
 from pathlib import Path
 import sqlite3
 import unittest
@@ -128,6 +131,74 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.unlock().status_code,200)
         stored = self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0]
         self.assertNotIn("synthetic-test-only-password",stored)
+
+    def recovery_ticket(self, code="synthetic-owner-recovery-code-with-256-bit-style-length", expires=None):
+        return patch("asset_status.Path.read_text", return_value=json.dumps({
+            "sha256":hashlib.sha256(code.encode()).hexdigest(),
+            "expires_at":time.time()+3600 if expires is None else expires}))
+
+    def test_recovery_preserves_records_revokes_sessions_and_is_single_use(self):
+        self.unlock()
+        self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers)
+        ciphertext=self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(PRIVATE_TAB,)).fetchone()[0]
+        old_id=json.loads(Fernet(os.environ["ASSET_STATUS_KEY"].encode()).decrypt(
+            self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0].encode()))["id"]
+        recovery_client=self.app.test_client()
+        payload={"code":"synthetic-owner-recovery-code-with-256-bit-style-length","password":"replacement-synthetic-password"}
+        with self.recovery_ticket():
+            response=recovery_client.post("/asset-status/recover",json=payload,headers={"X-Asset-Request":"1"})
+            self.assertEqual(response.status_code,200)
+            self.assertIn("Max-Age=0",response.headers["Set-Cookie"])
+            self.assertEqual(self.client.get("/asset-status/records",headers=self.headers).status_code,401)
+            self.assertEqual(recovery_client.post("/asset-status/recover",json=payload,headers={"X-Asset-Request":"1"}).status_code,403)
+            self.assertEqual(self.app.test_client().post("/asset-status/recover",json=payload,headers={"X-Asset-Request":"1"}).status_code,403)
+        self.assertEqual(self.unlock().status_code,401)
+        response=self.client.post("/asset-status/unlock",json={"password":payload["password"]},headers={"X-Asset-Request":"1"})
+        self.assertEqual(response.status_code,200)
+        self.headers["X-Asset-Token"]=response.json["token"]
+        self.assertEqual(validate_document(self.client.get("/asset-status/records",headers=self.headers).json["document"]),validate_document(SAMPLE))
+        self.assertEqual(self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(PRIVATE_TAB,)).fetchone()[0],ciphertext)
+        auth_ciphertext=self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0]
+        self.assertNotIn(payload["password"],auth_ciphertext)
+        self.assertNotIn(payload["code"],auth_ciphertext)
+        auth=json.loads(Fernet(os.environ["ASSET_STATUS_KEY"].encode()).decrypt(auth_ciphertext.encode()))
+        self.assertNotEqual(auth["id"],old_id)
+        self.assertIn(hashlib.sha256(payload["code"].encode()).hexdigest(),auth["used_recovery_codes"])
+
+    def test_recovery_rejects_wrong_expired_missing_and_malformed_tickets(self):
+        original=self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0]
+        payload={"code":"synthetic-owner-recovery-code-with-256-bit-style-length","password":"replacement-synthetic-password"}
+        with self.recovery_ticket():
+            for code in (None,123,"",payload["code"]+"wrong"):
+                self.assertEqual(self.client.post("/asset-status/recover",json={**payload,"code":code},headers=self.headers).status_code,403)
+        with self.recovery_ticket(expires=time.time()-1):
+            self.assertEqual(self.client.post("/asset-status/recover",json=payload,headers=self.headers).status_code,403)
+        for ticket in ("{}","not-json",'{"sha256": 1, "expires_at": 9999999999}'):
+            with patch("asset_status.Path.read_text",return_value=ticket):
+                self.assertEqual(self.client.post("/asset-status/recover",json=payload,headers=self.headers).status_code,403)
+        with patch("asset_status.Path.read_text",side_effect=FileNotFoundError):
+            self.assertEqual(self.client.post("/asset-status/recover",json=payload,headers=self.headers).status_code,403)
+        self.assertEqual(self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(AUTH_TAB,)).fetchone()[0],original)
+        self.assertEqual(self.unlock().status_code,200)
+
+    def test_recovery_requires_same_origin_header_and_valid_password(self):
+        payload={"code":"synthetic-owner-recovery-code-with-256-bit-style-length","password":"replacement-synthetic-password"}
+        with self.recovery_ticket():
+            self.assertEqual(self.client.post("/asset-status/recover",json=payload).status_code,403)
+            self.assertEqual(self.client.post("/asset-status/recover",json=payload,headers={**self.headers,"Origin":"https://untrusted.example"}).status_code,403)
+            for password in (None,123,"short","x"*257):
+                self.assertEqual(self.client.post("/asset-status/recover",json={**payload,"password":password},headers=self.headers).status_code,400)
+            self.assertEqual(self.unlock().status_code,200)
+            with patch.dict(os.environ,{"ASSET_STATUS_KEY":""}):
+                self.assertEqual(self.client.post("/asset-status/recover",json=payload,headers=self.headers).status_code,503)
+
+    def test_recovery_rechecks_single_use_ticket_after_transaction_lock(self):
+        payload={"code":"synthetic-owner-recovery-code-with-256-bit-style-length","password":"replacement-synthetic-password"}
+        # Simulate another worker consuming the ticket between the early check
+        # and acquisition of the PostgreSQL transaction lock.
+        with self.recovery_ticket(), patch("asset_status.recovery_digest",side_effect=[hashlib.sha256(payload["code"].encode()).hexdigest(),None]):
+            self.assertEqual(self.client.post("/asset-status/recover",json=payload,headers=self.headers).status_code,403)
+        self.assertEqual(self.unlock().status_code,200)
 
     def test_owner_setup_access_without_url_secrets(self):
         self.db.execute("DELETE FROM tab_notes WHERE tab=?",(AUTH_TAB,));self.db.commit()

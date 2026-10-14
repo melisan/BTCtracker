@@ -2,6 +2,28 @@
 (() => {
   const $ = id => document.getElementById(id);
   let setupToken = "";
+  function closeRecovery(){
+    $("recovery-form").reset();$("recovery-form").hidden=true;
+    $("unlock-form").hidden=false;$("start-recovery").hidden=false;$("start-setup").hidden=false;
+  }
+  $("start-recovery").addEventListener("click",()=>{
+    setupToken="";$("owner-form").reset();$("setup-form").reset();
+    $("owner-form").hidden=true;$("setup-form").hidden=true;$("unlock-form").hidden=true;
+    $("start-setup").hidden=true;$("start-recovery").hidden=true;$("recovery-form").hidden=false;
+    $("recovery-code").focus();message("");
+  });
+  $("cancel-recovery").addEventListener("click",()=>{closeRecovery();message("");});
+  $("recovery-form").addEventListener("submit",async event=>{
+    event.preventDefault();
+    if($("recovery-password").value!==$("recovery-confirm").value){message("비밀번호가 일치하지 않습니다.",true);return;}
+    const button=event.submitter;button.disabled=true;$("cancel-recovery").disabled=true;
+    try{
+      await api("recover","POST",{code:$("recovery-code").value.trim(),password:$("recovery-password").value});
+      token="";closeRecovery();$("password").focus();
+      message("비밀번호를 재설정했습니다. 새 비밀번호로 열어 주세요.");
+    }catch(error){message(error.message,true);}
+    finally{$("recovery-form").reset();button.disabled=false;$("cancel-recovery").disabled=false;}
+  });
   $("start-setup").addEventListener("click",()=>{$("owner-form").hidden=false;$("start-setup").hidden=true;});
   $("owner-form").addEventListener("submit",async event=>{
     event.preventDefault();const button=event.submitter;button.disabled=true;
@@ -84,7 +106,7 @@
     document.querySelectorAll("[data-sensitive]").forEach(el=>el.textContent="");
     document.querySelectorAll("[data-document-field]").forEach(el=>el.value="");
     $("updated").textContent=""; $("password").value="";
-    ["owner-code","new-password","confirm-password","workbook-file","blue-name","green-name"].forEach(id=>$(id).value="");
+    ["owner-code","new-password","confirm-password","recovery-code","recovery-password","recovery-confirm","workbook-file","blue-name","green-name"].forEach(id=>$(id).value="");
     $("workspace").hidden=true; $("locked").hidden=false;
   }
   async function lock(automatic=false) {

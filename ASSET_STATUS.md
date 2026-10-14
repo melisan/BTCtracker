@@ -24,6 +24,19 @@ The import control disappears after initial storage and refuses overwriting.
 - The unlock rate limit permits five failed attempts per five minutes per IP per
   worker. This is bounded application-level protection, not a distributed firewall.
 
+## Forgotten password recovery
+
+An authorized repository owner can issue a 256-bit random recovery code and deploy
+only its SHA-256 digest and Unix expiry in `asset_recovery.json`. Deliver the actual
+code privately to the owner, never through GitHub, a URL, logs, or browser storage.
+Use the protected page's “비밀번호를 잊으셨나요?” form to set a new password.
+The code expires after its configured deadline and is consumed once under the
+database transaction lock. Its used digest is retained in encrypted authentication
+storage across restarts. Reset rotates the session identifier and invalidates old
+sessions; it changes only the authentication record. Existing encrypted asset
+records and `ASSET_STATUS_KEY` remain untouched. Missing, expired, malformed, and
+used recovery tickets fail closed. Remove the expired ticket when practical.
+
 ## Persistence and migration
 
 One encrypted JSON record is stored under the reserved `__private_asset_status__`
