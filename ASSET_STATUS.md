@@ -11,11 +11,13 @@ entries are excluded from the average. Missing months are listed explicitly and
 remain part of the calendar denominator. Nursing-home bills, reimbursements and
 support/awards are excluded from overhead; source-purpose totals remain expandable.
 
-Separate runway bars show liquid money, liquid money plus deposit principal,
-adding recorded BTC value, and finally including the housing deposit. No future
+Three runway cards show liquid money, liquid money plus deposit principal,
+and adding recorded BTC value. Housing is excluded from projections while retained
+in the original asset graphs. Each card prominently shows years and months on the
+same time scale. No future
 interest, investment gain or inflation is assumed. Deposit maturity dates are
 checked against liquid funds in the interactive bank scenario. Additional monthly
-household use and the desired reserve period are local simulations, not writes to
+household use is a local simulation, not a write to
 the asset plan or household ledger. The controls retain their values on refresh.
 
 The default view is the retirement reconciliation dashboard. Its plan is stored

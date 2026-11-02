@@ -190,7 +190,6 @@ def project_care(plan, ledger, summary, annual_nursing):
         {"label": "현재 유동자금만", "amount": cash, "kind": "liquid"},
         {"label": "유동자금 + 남은 예금 원금", "amount": cash + summary["bank_total"], "kind": "bank"},
         {"label": "예금 + 유동자금 + BTC 기록값", "amount": cash + summary["bank_total"] + btc, "kind": "btc"},
-        {"label": "전체 보유자산 · 보증금 포함", "amount": summary["holdings_total"], "kind": "all"},
     ]
     for row in funds:
         row["months"] = max(0, row["amount"]) / monthly_total

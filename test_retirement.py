@@ -47,6 +47,7 @@ class ReconciliationTests(unittest.TestCase):
         self.assertIn("2026-05",result["missing_months"])
         self.assertEqual(sum(r["total"] for r in result["overhead_categories"]),600)
         self.assertEqual(result["funds"][1]["amount"],summary["liquid_projected"]+summary["bank_total"])
+        self.assertEqual([r["kind"] for r in result["funds"]],["liquid","bank","btc"])
 
     def test_projection_withholds_missing_history_or_configuration(self):
         summary=retirement.summarize(plan(),{"rows":[]},"2026-11-02")

@@ -2,7 +2,7 @@
 (() => {
   const root = document.getElementById("retirement-dashboard");
   let current = null, editing = false, busy = false;
-  const forecastSettings = {pool:"bank", extra:0, months:36};
+  const forecastSettings = {extra:0};
   const fmt = value => {
     if (value == null) return "계산 보류";
     const sign = value < 0 ? "−" : "";
@@ -41,49 +41,59 @@
   }
   function careProjection(projection, summary) {
     const section = el("section", null, "ret-care-projection"); section.id="ret-projection";
-    section.append(el("h2", "앞으로 얼마나 사용할 수 있는지"));
+    section.append(el("h2", "이 자금으로 얼마나 지낼 수 있는지"));
     if(!projection?.available){section.append(el("p",projection?.reason||"지출 전망을 준비 중입니다.","hint"));return section;}
-    const p=projection;
-    section.append(el("p", `요양원비는 고정 월액, 나머지는 ${p.history_start}부터 ${p.history_end_exclusive} 직전까지 완료된 ${p.history_months}개월 평균입니다.`, "hint"));
-    section.append(cards([["고정 요양원비 · 월",p.monthly_nursing],["의료·생활 부대비용 · 월평균",p.monthly_overhead],["기본 총사용액 · 월",p.monthly_total],["기본 총사용액 · 연",p.annual_total]]));
-    const history=el("details");history.append(el("summary","부대비용 월평균 산출 내역"),table(["분류","기간 실제 합계","월평균"],p.overhead_categories.map(r=>[r.label,fmt(r.total),fmt(r.monthly)])));
-    history.append(el("p","요양원 정기 청구는 고정액으로 대체합니다. 정산·상환과 지원·포상은 부대비용 평균에서 제외하고, 의료·간병·의복·식비·통신·주택관리·기타 기록은 포함합니다.","hint"));
-    if(p.missing_months.length)history.append(el("p",`기록이 없는 달: ${p.missing_months.join(", ")}. 달력상 기간 전체로 나누며 해당 월 기록은 0원으로 반영됩니다. 현재 진행 중인 월은 평균에서 제외합니다.`,"hint"));section.append(history);
-    const controls=el("div",null,"ret-projection-controls");
-    const poolLabel=el("label","사용할 자산 범위"),pool=el("select");
-    p.funds.forEach(row=>{const option=el("option",row.label);option.value=row.kind;pool.append(option);});pool.value=forecastSettings.pool;poolLabel.append(pool);
-    const extraLabel=el("label","월 추가 가구사용액 (원)"),extra=el("input");extra.type="number";extra.min="0";extra.max="9000000000000000";extra.step="10000";extra.value=forecastSettings.extra;extraLabel.append(extra);
-    const horizonLabel=el("label","확보하려는 기간 (개월)"),horizon=el("input");horizon.type="number";horizon.min="1";horizon.max="1200";horizon.step="1";horizon.value=forecastSettings.months;horizonLabel.append(horizon);
-    controls.append(poolLabel,extraLabel,horizonLabel);section.append(controls);
-    const output=el("div",null,"ret-projection-output");section.append(output);
-    function duration(months){const full=Math.max(0,Math.floor(months));return `약 ${full.toLocaleString("ko-KR")}개월 · ${Math.floor(full/12)}년 ${full%12}개월`;}
-    function update(){
-      if(!extra.validity.valid||!horizon.validity.valid)return;
-      forecastSettings.pool=pool.value;forecastSettings.extra=Number(extra.value)||0;forecastSettings.months=Number(horizon.value)||36;
-      const cost=p.monthly_total+forecastSettings.extra,chosen=p.funds.find(r=>r.kind===pool.value)||p.funds[1],months=forecastSettings.months;
+    const p=projection, pools=p.funds.filter(r=>["liquid","bank","btc"].includes(r.kind));
+    const labels={liquid:"유동자금",bank:"은행 예치금 + 유동자금",btc:"은행 예치금 + 유동자금 + BTC"};
+    const colors={liquid:"flow-liquid",bank:"flow-bank",btc:"flow-btc"};
+    section.append(el("p", `고정 요양원비 월 ${fmt(p.monthly_nursing)} + 의료·생활비 월평균 ${fmt(p.monthly_overhead)}`, "hint"));
+    const base=el("p",null,"ret-runway-baseline");base.append(el("span","매달 사용하는 금액"),el("strong",fmt(p.monthly_total)));section.append(base);
+    const output=el("div",null,"ret-three-runways");section.append(output);
+    const options=el("details",null,"ret-runway-options");options.append(el("summary","월 추가 사용액 조정"));
+    const label=el("label","월 추가 가구사용액 (원)"),extra=el("input");
+    extra.type="number";extra.min="0";extra.max="9000000000000000";extra.step="1";extra.value=forecastSettings.extra;label.append(extra);options.append(label);section.append(options);
+    function duration(months){const full=Math.max(0,Math.floor(months));return {years:Math.floor(full/12),months:full%12,total:full};}
+    function draw(){
+      if(!extra.validity.valid)return;
+      forecastSettings.extra=Number(extra.value)||0;
+      const cost=p.monthly_total+forecastSettings.extra;
+      base.querySelector("strong").textContent=fmt(cost);
       output.replaceChildren();
-      output.append(cards([["선택 자산",chosen.amount],["추가 사용 포함 · 월",cost],["이 속도로 사용할 수 있는 기간",null]]));
-      const period=output.querySelector(".ret-card:last-child strong");period.textContent=duration(Math.max(0,chosen.amount)/cost);
-      const rows=el("div",null,"ret-runway-rows"),max=Math.max(...p.funds.map(r=>Math.max(0,r.amount)/cost),1);
-      p.funds.forEach((row,index)=>{
-        const line=el("div",null,"ret-runway-row"),head=el("div",null,"ret-flow-title");head.append(el("span",row.label),el("strong",duration(Math.max(0,row.amount)/cost)));
-        const track=el("div",null,"ret-flow-track"),bar=el("div",null,`ret-flow-segment ${["flow-liquid","flow-bank","flow-btc","flow-housing"][index]}`);bar.style.width=`${Math.max(0,row.amount)/cost/max*100}%`;track.append(bar);track.setAttribute("role","img");track.setAttribute("aria-label",`${row.label}: ${fmt(row.amount)}, ${duration(Math.max(0,row.amount)/cost)}`);
-        line.append(head,track);rows.append(line);
-      });output.append(rows);
-      const needed=cost*months,left=chosen.amount-needed,maxExtra=Math.max(0,chosen.amount/months-p.monthly_total);
-      output.append(cards([[`${months}개월 동안 필요한 금액`,needed],[`${months}개월 후 예상잔액`,left],[`기본 돌봄비용 확보 후 · 월 추가 사용 여력`,maxExtra,`${months}개월에 걸쳐 나누어 쓸 경우`]]));
-      if(pool.value==="bank"){
-        let balance=summary.liquid_projected,previous=0;
-        const start=new Date(summary.today+"T00:00:00+09:00").getTime();
-        for(const event of [...p.maturities].sort((a,b)=>a.date.localeCompare(b.date))){
-          const t=(new Date(event.date+"T00:00:00+09:00").getTime()-start)/(86400000*365.25/12);
-          if(balance<cost*(t-previous)){output.append(el("p",`예금 만기 전 유동자금이 먼저 소진됩니다: ${duration(previous+Math.max(0,balance)/cost)}. 위 전체 예금 기간과 별개로 만기 전 필요한 현금 확보를 확인하세요.`,"ret-warning"));break;}
-          balance-=cost*(t-previous);balance+=event.amount;previous=t;
+      const maxMonths=Math.max(...pools.map(r=>Math.max(0,r.amount)/cost),1);
+      const axisMonths=Math.max(12,Math.ceil(maxMonths/12)*12);
+      for(const row of pools){
+        const months=Math.max(0,row.amount)/cost,d=duration(months);
+        const card=el("div",null,`ret-runway-card runway-${row.kind}`);
+        const header=el("div",null,"ret-runway-card-head");header.append(el("h3",labels[row.kind]),el("span",fmt(row.amount)));card.append(header);
+        const period=el("div",null,"ret-runway-period");period.append(el("strong",`약 ${d.years}년 ${d.months}개월`),el("span",`총 ${d.total.toLocaleString("ko-KR")}개월`));card.append(period);
+        const track=el("div",null,"ret-flow-track"),bar=el("div",null,`ret-flow-segment ${colors[row.kind]}`);
+        bar.style.width=`${months/axisMonths*100}%`;track.append(bar);track.setAttribute("role","img");track.setAttribute("aria-label",`${labels[row.kind]} ${fmt(row.amount)}으로 약 ${d.years}년 ${d.months}개월`);
+        card.append(track);
+        const axis=el("div",null,"ret-runway-axis");
+        for(let i=0;i<=3;i++)axis.append(el("span",i===0?"지금":`${(axisMonths/12*i/3).toLocaleString("ko-KR",{maximumFractionDigits:1})}년`));
+        card.append(axis);
+        if(row.kind==="btc")card.append(el("p","BTC는 기록된 평가금액으로 환금화할 경우입니다.","hint"));
+        if(row.kind==="bank"){
+          let balance=summary.liquid_projected,previous=0;
+          const start=new Date(summary.today+"T00:00:00+09:00").getTime();
+          for(const event of [...p.maturities].sort((a,b)=>a.date.localeCompare(b.date))){
+            const t=(new Date(event.date+"T00:00:00+09:00").getTime()-start)/(86400000*365.25/12);
+            if(balance<cost*(t-previous)){
+              const gap=duration(previous+Math.max(0,balance)/cost);
+              card.append(el("p",`예금 만기 전 유동자금은 약 ${gap.total}개월 후 먼저 소진됩니다. 만기까지의 현금 확보가 별도로 필요합니다.`,"ret-warning"));break;
+            }
+            balance-=cost*(t-previous);balance+=event.amount;previous=t;
+          }
         }
+        output.append(card);
       }
-      output.append(el("p","현재 잔액과 같은 월 지출이 유지되는 단순 전망입니다. 향후 예금이자·투자수익·물가상승은 더하지 않습니다. BTC는 기록값으로 환금화하고 보증금은 반환받아 사용할 경우의 범위를 따로 표시합니다. 이 조정은 시뮬레이션이며 저장된 자산·지출을 바꾸지 않습니다.","hint"));
     }
-    [pool,extra,horizon].forEach(input=>input.addEventListener("input",update));update();return section;
+    extra.addEventListener("input",draw);draw();
+    const history=el("details");history.append(el("summary","의료·생활비 월평균 산출 내역"),table(["분류","기간 실제 합계","월평균"],p.overhead_categories.map(r=>[r.label,fmt(r.total),fmt(r.monthly)])));
+    history.append(el("p",`${p.history_start}부터 ${p.history_end_exclusive} 직전까지 완료된 ${p.history_months}개월 평균입니다. 정기 요양원비·정산·상환·지원·포상은 부대비용에서 제외합니다.`,"hint"));
+    if(p.missing_months.length)history.append(el("p",`기록이 없는 달: ${p.missing_months.join(", ")}. 해당 달도 평균 기간에 포함하며 진행 중인 월은 제외합니다.`,"hint"));section.append(history);
+    section.append(el("p","세 막대는 같은 시간 척도입니다. 주택 보증금은 이 전망에서 제외합니다. 현재 월 지출이 유지되고, 향후 이자·투자수익·물가상승은 없는 기준입니다. 추가 사용액 조정은 저장된 자산을 바꾸지 않습니다.","hint"));
+    return section;
   }
   function fundGraph(plan, s) {
     const figure = el("figure", null, "ret-fund-graph");
