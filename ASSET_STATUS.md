@@ -1,5 +1,20 @@
 # Asset status
 
+## Current access behavior
+
+The Asset status page opens saved records directly, without a password, setup
+code, recovery ticket, session cookie or automatic lock. Anyone with the app URL
+can view it. The existing ASSET_STATUS_KEY and encrypted records are preserved;
+do not replace the key. Access no longer depends on the legacy authentication
+record being readable. Same-origin write checks, input validation, initial-import
+overwrite prevention and revision checks still apply.
+
+The page loads records on entry and when restored from browser history. Editing
+and saving remain explicit. Legacy password endpoints remain for compatibility
+with older maintenance tools but do not control record access.
+
+## Historical password implementation (superseded)
+
 The protected page is `/asset-status/`. It uses only first-party scripts and styles,
 and loads financial records only after password authentication. It has no analytics,
 third-party assets or browser storage. Before the first record is saved, an

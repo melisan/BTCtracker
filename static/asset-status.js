@@ -1,56 +1,10 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
-  let setupToken = "";
-  function closeRecovery(){
-    $("recovery-form").reset();$("recovery-form").hidden=true;
-    $("unlock-form").hidden=false;$("start-recovery").hidden=false;$("start-setup").hidden=false;
-  }
-  $("start-recovery").addEventListener("click",()=>{
-    setupToken="";$("owner-form").reset();$("setup-form").reset();
-    $("owner-form").hidden=true;$("setup-form").hidden=true;$("unlock-form").hidden=true;
-    $("start-setup").hidden=true;$("start-recovery").hidden=true;$("recovery-form").hidden=false;
-    $("recovery-code").focus();message("");
-  });
-  $("cancel-recovery").addEventListener("click",()=>{closeRecovery();message("");});
-  $("recovery-form").addEventListener("submit",async event=>{
-    event.preventDefault();
-    if($("recovery-password").value!==$("recovery-confirm").value){message("비밀번호가 일치하지 않습니다.",true);return;}
-    const button=event.submitter;button.disabled=true;$("cancel-recovery").disabled=true;
-    try{
-      await api("recover","POST",{code:$("recovery-code").value.trim(),password:$("recovery-password").value});
-      token="";closeRecovery();$("password").focus();
-      message("비밀번호를 재설정했습니다. 새 비밀번호로 열어 주세요.");
-    }catch(error){message(error.message,true);}
-    finally{$("recovery-form").reset();button.disabled=false;$("cancel-recovery").disabled=false;}
-  });
-  $("start-setup").addEventListener("click",()=>{$("owner-form").hidden=false;$("start-setup").hidden=true;});
-  $("owner-form").addEventListener("submit",async event=>{
-    event.preventDefault();const button=event.submitter;button.disabled=true;
-    setupToken=$("owner-code").value;$("owner-code").value="";
-    try{
-      await api("setup-access","POST",{});
-      $("owner-form").hidden=true;$("unlock-form").hidden=true;$("setup-form").hidden=false;
-      message("소유자 확인을 완료했습니다. 사용할 비밀번호를 정해 주세요.");
-    }catch(error){setupToken="";message(error.message,true);}
-    finally{button.disabled=false;}
-  });
-  $("setup-form").addEventListener("submit",async event=>{
-    event.preventDefault();
-    const password=$("new-password").value;
-    if(password!==$("confirm-password").value){message("비밀번호가 일치하지 않습니다.",true);return;}
-    const button=event.submitter; button.disabled=true;
-    try {
-      await api("setup","POST",{password}); setupToken="";
-      $("setup-form").hidden=true; $("unlock-form").hidden=false;
-      message("비밀번호를 설정했습니다. 설정한 비밀번호로 열어 주세요.");
-    } catch(error){message(error.message,true);}
-    finally {$("new-password").value="";$("confirm-password").value="";button.disabled=false;}
-  });
   const groups = {total:"전체자산",bonds:"현재 자산 현황",movement:"자금이동대상"};
   const fields = ["category","name","description","account","amount","interest","notes","maturity"];
   const labels = ["항목","이름","내용","계좌번호","원본총액 (원)","이자 (원)","내용(비고)","만기일"];
-  let data = null, token = "", dirty = false, saving = false, timer = null, deadline = 0, generation = 0;
+  let data = null, dirty = false, saving = false, generation = 0;
   const editingSections = new Set();
   function applyEditState(){
     document.querySelectorAll(".asset-section").forEach(section=>{
@@ -91,28 +45,11 @@
   function changed() { dirty=true; syncMovement();totals(); document.querySelectorAll(".section-save-status").forEach(el=>el.textContent="");message("수정한 내용이 있습니다. 변경사항을 저장해 주세요."); }
   async function api(path,method="GET",body) {
     const response=await fetch(`/asset-status/${path}`,{method,credentials:"same-origin",cache:"no-store",
-      headers:{"Content-Type":"application/json","X-Asset-Request":"1","X-Asset-Token":token,"X-Asset-Setup":setupToken},
+      headers:{"Content-Type":"application/json","X-Asset-Request":"1"},
       body:body===undefined?undefined:JSON.stringify(body)});
     const result=await response.json();
     if(!response.ok) throw new Error(result.error || "요청을 완료하지 못했습니다.");
     return result;
-  }
-  function clear() {
-    closePrintPreview();
-    generation++; data=null; token=""; dirty=false; clearInterval(timer); timer=null;
-    editingSections.clear();
-    document.querySelectorAll(".print-value").forEach(el=>el.remove());
-    document.querySelectorAll(".sensitive-table").forEach(el=>el.replaceChildren());
-    document.querySelectorAll("[data-sensitive]").forEach(el=>el.textContent="");
-    document.querySelectorAll("[data-document-field]").forEach(el=>el.value="");
-    $("updated").textContent=""; $("password").value="";
-    ["owner-code","new-password","confirm-password","recovery-code","recovery-password","recovery-confirm","workbook-file","blue-name","green-name"].forEach(id=>$(id).value="");
-    $("workspace").hidden=true; $("locked").hidden=false;
-  }
-  async function lock(automatic=false) {
-    if(!automatic && dirty && !confirm("저장하지 않은 수정 내용이 있습니다. 내용을 버리고 잠글까요?")) return;
-    clear(); message(automatic?"열람 시간이 끝나 잠겼습니다. 비밀번호를 다시 입력해 주세요.":"잠겼습니다.");
-    try { await api("lock","POST",{}); } catch { /* Memory is cleared even without a network. */ }
   }
   function applyNameColor(input,value) {
     input.classList.remove("name-blue","name-green");
@@ -267,11 +204,10 @@
     totals();
     applyEditState();
   }
-  $("unlock-form").addEventListener("submit",async event=>{
-    event.preventDefault();const button=event.currentTarget.querySelector("button");button.disabled=true;const current=++generation;
+  async function loadRecords(){
+    const current=++generation;
     try{
-      const auth=await api("unlock","POST",{password:$("password").value});$("password").value="";if(current!==generation)return;
-      token=auth.token;const result=await api("records");if(current!==generation)return;
+      const result=await api("records");if(current!==generation)return;
       data=result.document||{accounts:[],other_assets:[],future:[],expenses:[],other:"",total_scope:"c1",name_colors:{}};
       let linkedExisting=false;const used=new Set(data.accounts.filter(r=>r.source_id).map(r=>r.source_id));
       data.accounts.filter(r=>r.group==="movement"&&!r.source_id&&r.account&&r.name).forEach(row=>{
@@ -279,10 +215,9 @@
         if(matches.length===1&&!used.has(matches[0].id)){row.source_id=matches[0].id;used.add(row.source_id);if(row.notes!==matches[0].notes)row.review_notes=row.review_notes||row.notes;linkedExisting=true;}
       });
       if(linkedExisting)dirty=true;
-      $("locked").hidden=true;$("workspace").hidden=false;render();message(linkedExisting?"원본이 일치하는 이동대상을 보유자산과 연결했습니다. 변경사항을 저장해 주세요.":"");deadline=Date.now()+auth.expires_in*1000;
-      const tick=()=>{const left=Math.max(0,Math.floor((deadline-Date.now())/1000));$("remaining").textContent=`${Math.floor(left/60)}분 ${left%60}초`;if(!left)lock(true);else if(renderedDay!==todayKorea())render();else totals();};tick();timer=setInterval(tick,1000);
-    }catch(error){if(current===generation)message(error.message,true);}finally{$("password").value="";button.disabled=false;}
-  });
+      $("workspace").hidden=false;render();message(linkedExisting?"원본이 일치하는 이동대상을 보유자산과 연결했습니다. 변경사항을 저장해 주세요.":"");
+    }catch(error){if(current===generation)message(error.message,true);}
+  }
   $("workbook-form").addEventListener("submit",async event=>{
     event.preventDefault(); if(saving || !data || data.revision)return;
     const file=$("workbook-file").files[0]; if(!file)return;
@@ -292,7 +227,7 @@
     saving=true;const current=generation;const button=event.submitter;button.disabled=true;
     try {
       const response=await fetch("/asset-status/initial-workbook",{method:"POST",credentials:"same-origin",cache:"no-store",
-        headers:{"Content-Type":"application/octet-stream","X-Asset-Request":"1","X-Asset-Token":token,"X-Asset-Name-Colors":encodeURIComponent(JSON.stringify(colors))},body:file});
+        headers:{"Content-Type":"application/octet-stream","X-Asset-Request":"1","X-Asset-Name-Colors":encodeURIComponent(JSON.stringify(colors))},body:file});
       const result=await response.json();if(!response.ok)throw new Error(result.error||"파일을 등록하지 못했습니다.");
       if(current!==generation)return;data=result.document;dirty=false;render();message("엑셀 내용을 등록했습니다. 이제 이 화면에서 수정하고 저장할 수 있습니다.");
     }catch(error){if(current===generation)message(error.message,true);}
@@ -320,8 +255,8 @@
     if(current!==generation)return;
     const button=$("download-excel");button.disabled=true;
     try{
-      const response=await fetch("/asset-status/export",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"X-Asset-Request":"1","X-Asset-Token":token}});
-      if(!response.ok)throw new Error("엑셀 파일을 내려받지 못했습니다. 비밀번호와 저장 상태를 확인해 주세요.");
+      const response=await fetch("/asset-status/export",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"X-Asset-Request":"1"}});
+      if(!response.ok)throw new Error("엑셀 파일을 내려받지 못했습니다. 저장 상태와 연결을 확인해 주세요.");
       const blob=await response.blob();if(current!==generation)return;
       const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`asset-status-${new Date().toISOString().slice(0,10)}.xlsx`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
       message("엑셀 다운로드를 시작했습니다.");
@@ -393,8 +328,7 @@
   document.querySelectorAll("[data-document-field]").forEach(input=>input.addEventListener("input",()=>{
     const key=input.dataset.documentField;data[key]=input.type==="number"?(input.value===""?null:Number(input.value)):input.value;changed();
   }));
-  $("lock").addEventListener("click",()=>lock());
   window.addEventListener("beforeunload",event=>{if(dirty){event.preventDefault();event.returnValue="";}});
-  window.addEventListener("pagehide",()=>{setupToken="";clear();fetch("/asset-status/lock",{method:"POST",headers:{"X-Asset-Request":"1"},keepalive:true}).catch(()=>{});});
-  window.addEventListener("pageshow",event=>{if(event.persisted){clear();message("비밀번호를 다시 입력해 주세요.");}});
+  window.addEventListener("pageshow",event=>{if(event.persisted&&!dirty)loadRecords();});
+  loadRecords();
 })();

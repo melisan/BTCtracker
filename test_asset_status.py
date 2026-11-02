@@ -52,9 +52,14 @@ class SecurityTests(unittest.TestCase):
         if response.status_code == 200:
             self.headers["X-Asset-Token"] = response.json["token"]
         return response
-    def test_requires_password_for_read_and_write(self):
-        self.assertEqual(self.client.get("/asset-status/records").status_code,401)
-        self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,401)
+    def test_direct_read_and_write_without_password(self):
+        self.assertEqual(self.client.get("/asset-status/records").status_code,200)
+        self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,200)
+        fresh = self.app.test_client()
+        self.assertEqual(validate_document(fresh.get("/asset-status/records").json["document"]),validate_document(SAMPLE))
+        self.db.execute("UPDATE tab_notes SET content='unreadable old auth' WHERE tab=?",(AUTH_TAB,))
+        self.db.commit()
+        self.assertEqual(fresh.get("/asset-status/records").status_code,200)
     def test_wrong_password_and_rate_limit(self):
         for _ in range(5):
             self.assertEqual(self.client.post("/asset-status/unlock",json={"password":"wrong"},headers=self.headers).status_code,401)
@@ -74,7 +79,7 @@ class SecurityTests(unittest.TestCase):
         stored = self.db.execute("SELECT content FROM tab_notes WHERE tab=?",(PRIVATE_TAB,)).fetchone()[0]
         self.assertNotIn("001-000",stored)
         self.assertNotIn("가상",stored)
-        self.assertEqual(self.client.get("/asset-status/records").status_code,401)
+        self.assertEqual(self.client.get("/asset-status/records").status_code,200)
         read = self.client.get("/asset-status/records",headers=self.headers).json["document"]
         self.assertEqual(validate_document(read),validate_document(SAMPLE))
         self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,409)
@@ -83,12 +88,12 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.client.put("/asset-status/records",json=read,headers=self.headers).status_code,409)
     def test_lock_and_revisit(self):
         self.unlock(); self.client.post("/asset-status/lock",json={},headers=self.headers)
-        self.assertEqual(self.client.get("/asset-status/records").status_code,401)
+        self.assertEqual(self.client.get("/asset-status/records").status_code,200)
         self.unlock(); response = self.client.get("/asset-status/")
         self.assertEqual(response.status_code,200)
         self.assertIn("no-store", response.headers["Cache-Control"])
         self.assertIn("default-src 'none'",response.headers["Content-Security-Policy"])
-        self.assertEqual(self.client.get("/asset-status/records").status_code,401)
+        self.assertEqual(self.client.get("/asset-status/records").status_code,200)
     def test_invalid_values(self):
         for field,value in [("amount",float("nan")),("amount","1,000"),("maturity","2026-02-30"),("account",1234)]:
             bad = copy.deepcopy(SAMPLE); bad["accounts"][0][field] = value
@@ -97,7 +102,7 @@ class SecurityTests(unittest.TestCase):
         self.unlock(); self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers)
         with patch.dict(os.environ,{"ASSET_STATUS_KEY":Fernet.generate_key().decode()}):
             self.unlock()
-            self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,401)
+            self.assertEqual(self.client.post("/asset-status/records",json=SAMPLE,headers=self.headers).status_code,503)
 
     def test_public_notes_cannot_read_or_modify_private_storage(self):
         # Load route definitions without running existing production startup migrations.
@@ -149,7 +154,7 @@ class SecurityTests(unittest.TestCase):
             response=recovery_client.post("/asset-status/recover",json=payload,headers={"X-Asset-Request":"1"})
             self.assertEqual(response.status_code,200)
             self.assertIn("Max-Age=0",response.headers["Set-Cookie"])
-            self.assertEqual(self.client.get("/asset-status/records",headers=self.headers).status_code,401)
+            self.assertEqual(self.client.get("/asset-status/records",headers=self.headers).status_code,200)
             self.assertEqual(recovery_client.post("/asset-status/recover",json=payload,headers={"X-Asset-Request":"1"}).status_code,403)
             self.assertEqual(self.app.test_client().post("/asset-status/recover",json=payload,headers={"X-Asset-Request":"1"}).status_code,403)
         self.assertEqual(self.unlock().status_code,401)
@@ -217,13 +222,11 @@ class SecurityTests(unittest.TestCase):
         self.assertNotIn("document", imported.json)
         self.assertEqual(len(imported.json["digest"]),64)
         self.assertEqual(self.client.post("/asset-status/initial-import",json=SAMPLE,headers=headers).status_code,409)
-        self.assertEqual(self.client.get("/asset-status/records",headers=headers).status_code,401)
+        self.assertEqual(self.client.get("/asset-status/records",headers=headers).status_code,200)
         self.unlock()
         self.assertEqual(validate_document(self.client.get("/asset-status/records",headers=self.headers).json["document"]),validate_document(SAMPLE))
 
-    def test_browser_workbook_import_requires_password_and_is_initial_only(self):
-        self.assertEqual(self.client.post("/asset-status/initial-workbook",data=b"sample",headers=self.headers).status_code,401)
-        self.unlock()
+    def test_browser_workbook_import_is_direct_and_initial_only(self):
         with patch("import_asset_status.read_document",return_value=SAMPLE) as reader:
             response=self.client.post("/asset-status/initial-workbook",data=b"sample",headers=self.headers,content_type="application/octet-stream")
             self.assertEqual(response.status_code,200)
@@ -232,9 +235,8 @@ class SecurityTests(unittest.TestCase):
             self.assertEqual(self.client.post("/asset-status/initial-workbook",data=b"replacement",headers=self.headers).status_code,409)
             reader.assert_not_called()
 
-    def test_export_requires_password_and_preserves_safe_cell_types(self):
-        self.assertEqual(self.client.post("/asset-status/export",headers=self.headers).status_code,401)
-        self.unlock()
+    def test_export_is_direct_and_preserves_safe_cell_types(self):
+        self.assertEqual(self.client.post("/asset-status/export",headers=self.headers).status_code,409)
         sample=copy.deepcopy(SAMPLE)
         sample["accounts"][0]["description"]="=1+1"
         self.client.post("/asset-status/records",json=sample,headers=self.headers)

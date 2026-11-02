@@ -1,4 +1,4 @@
-"""Password-gated asset records. Only encrypted JSON is persisted."""
+"""Direct-access asset records. Only encrypted JSON is persisted."""
 import hashlib
 import hmac
 import json
@@ -159,13 +159,13 @@ def create_asset_blueprint(get_db, query):
         finally:
             conn.close()
 
-    def config():
+    def config(include_auth=True):
         key = os.environ.get("ASSET_STATUS_KEY", "")
         if not key:
             return None
         try:
             cipher = Fernet(key.encode())
-            return cipher, URLSafeTimedSerializer(key, salt="asset-status-session"), load_auth(cipher)
+            return cipher, URLSafeTimedSerializer(key, salt="asset-status-session"), load_auth(cipher) if include_auth else None
         except Exception:
             return None
 
@@ -196,8 +196,8 @@ def create_asset_blueprint(get_db, query):
         if request.content_length and request.content_length > MAX_BYTES:
             return jsonify(error="저장할 내용이 너무 큽니다."), 413
         if request.path.endswith(("/records", "/initial-workbook", "/export")):
-            if not authenticated(config()):
-                return jsonify(error="비밀번호를 다시 입력해 주세요."), 401
+            if not config(include_auth=False):
+                return jsonify(error="자산 현황의 저장 설정을 확인해 주세요."), 503
 
     @bp.after_request
     def privacy_headers(response):
@@ -336,7 +336,7 @@ def create_asset_blueprint(get_db, query):
     @bp.post("/export")
     def export():
         from asset_export import export_workbook
-        cfg = config()
+        cfg = config(include_auth=False)
         conn = get_db()
         try:
             row = query(conn, "SELECT content FROM tab_notes WHERE tab = %s ORDER BY id LIMIT 1", (PRIVATE_TAB,)).fetchone()
@@ -356,7 +356,7 @@ def create_asset_blueprint(get_db, query):
     @bp.post("/initial-import")
     @bp.post("/initial-workbook")
     def records():
-        cfg = config()
+        cfg = config(include_auth=False)
         owner_import = request.path.endswith("/initial-import")
         if owner_import:
             if not cfg:
