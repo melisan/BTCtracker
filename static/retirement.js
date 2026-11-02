@@ -38,6 +38,54 @@
   function accountRows(rows, plan, recovered) {
     return rows.map(row => [row.name, row.description, row.account || "—", fmt(row.amount), row.maturity || "만기 미입력", recovered ? fmt(plan.recovery_overrides[row.id] ?? row.amount + (row.interest || 0)) : fmt(row.interest || 0)]);
   }
+  function fundGraph(plan, s) {
+    const figure = el("figure", null, "ret-fund-graph");
+    figure.append(el("figcaption", "처음자산이 지금 어디에 있는지"));
+    if (s.available_total == null || s.available_total <= 0) {
+      figure.append(el("p", "가계부 연결 후 자산 흐름을 표시합니다.", "hint")); return figure;
+    }
+    const pct = (value, total) => {const ratio=value/total*100;return `${ratio.toLocaleString("ko-KR", {maximumFractionDigits:ratio!==0&&Math.abs(ratio)<.1?3:1})}%`;};
+    function bar(items, total, name) {
+      const track = el("div", null, "ret-flow-track");
+      track.setAttribute("role", "img");
+      track.setAttribute("aria-label", `${name}: ${items.map(r=>`${r.label} ${fmt(r.value)}`).join(", ")}`);
+      items.forEach(item => {
+        if (item.value <= 0) return;
+        const segment = el("div", null, `ret-flow-segment ${item.color}`);
+        segment.style.width = `${item.value / total * 100}%`;
+        segment.title = `${item.label} · ${fmt(item.value)} · ${pct(item.value,total)}`;
+        if (item.value / total >= .12) segment.append(el("span", `${item.label} ${pct(item.value,total)}`));
+        track.append(segment);
+      }); return track;
+    }
+    function legend(items, total) {
+      const list = el("div", null, "ret-flow-legend");
+      items.forEach(item => {
+        const card = el("div", null, "ret-flow-key"), title = el("span", null, "ret-flow-key-title");
+        const dot = el("i", null, item.color); dot.setAttribute("aria-hidden", "true");
+        title.append(dot, document.createTextNode(item.label));
+        card.append(title, el("strong", fmt(item.value)), el("small", pct(item.value,total))); list.append(card);
+      }); return list;
+    }
+    const source = [{label:"처음자산",value:s.origin_total,color:"flow-origin"},{label:"회수 이자",value:s.interest_received,color:"flow-interest"}];
+    const sourceTitle = el("div", null, "ret-flow-title"); sourceTitle.append(el("span", "출발 · 처음자산 + 회수 이자"), el("strong", fmt(s.available_total)));
+    figure.append(sourceTitle, bar(source, s.available_total, "자금 원천"));
+    figure.append(el("p", `고정 원본 ${fmt(s.origin_total)} + 회수 이자 ${fmt(s.interest_received)}`, "ret-flow-source-note"));
+    const allocation = [{label:"현재 보유",value:s.holdings_total,color:"flow-held"},{label:"지급·이전",value:s.paid_total,color:"flow-paid"},{label:"미대사 차액",value:s.gap,color:"flow-gap"}];
+    const balanced = allocation.every(r=>r.value>=0) && s.interest_received>=0;
+    const nowTitle = el("div", null, "ret-flow-title"); nowTitle.append(el("span", "현재 · 남은 자산과 사용된 자금")); figure.append(nowTitle);
+    if (balanced) figure.append(bar(allocation,s.available_total,"현재 자금 배분"));
+    else figure.append(el("p","음수 잔액 또는 대사 초과가 있어 비율 그래프를 보류합니다. 아래 금액을 확인해 주세요.","ret-warning"));
+    figure.append(legend(allocation,s.available_total));
+    figure.append(el("p", "두 막대는 같은 금액 척도입니다. 지급·이전에는 자동차·생활비·가구로 이전한 금액이 포함됩니다. 작은 미대사 차액은 실제 비율대로 표시합니다.", "hint"));
+    const snapshot = kind => plan.holdings.filter(r=>r.kind===kind).reduce((n,r)=>n+r.amount,0);
+    const held = [{label:"은행 예치금",value:s.bank_total,color:"flow-bank"},{label:"주택 보증금",value:snapshot("housing"),color:"flow-housing"},{label:"BTC 기록값",value:snapshot("btc"),color:"flow-btc"},{label:"유동자금",value:s.liquid_projected,color:"flow-liquid"}];
+    const other = snapshot("other");if(other)held.push({label:"기타 보유",value:other,color:"flow-origin"});
+    const detail = el("details", null, "ret-flow-details"); detail.open = true;
+    detail.append(el("summary", "남아 있는 자산의 구성"));
+    if(s.holdings_total>0&&held.every(r=>r.value>=0))detail.append(bar(held,s.holdings_total,"현재 보유자산 구성"));
+    detail.append(legend(held,s.holdings_total||1));figure.append(detail);return figure;
+  }
   async function get(path) {
     const response = await fetch(`/asset-status/${path}`, {cache: "no-store"});
     const result = await response.json(); if (!response.ok) throw new Error(result.error || "자료를 불러오지 못했습니다."); return result;
@@ -58,6 +106,7 @@
     if (ledger.stale) root.append(el("p", ledger.error, "ret-warning"));
     root.append(cards([["처음자산 · 고정 원본", s.origin_total], ["현재 보유자산 · 계산잔액", s.holdings_total, "보증금·BTC·예금·유동자금 포함"], ["지급·이전 누계", s.paid_total, "주요 지급 + 가계부 홍천지출"], ["미대사 차액", s.gap, "대사 가정에 따른 잔여 차액"]]));
     root.append(el("p", "처음자산 + 회수 이자 = 현재 보유자산 + 지급·이전 누계 + 미대사 차액", "ret-equation"));
+    root.append(fundGraph(plan,s));
     const nav = el("div", null, "section-links");
     [["ret-origin", "원본·회수 계좌"], ["ret-holdings", "현재 보유"], ["ret-major", "주요 지급·이전"], ["ret-spending", "홍천지출 누계"]].forEach(([id, name]) => {const a = el("a", name); a.href = `#${id}`; nav.append(a);}); root.append(nav);
 
