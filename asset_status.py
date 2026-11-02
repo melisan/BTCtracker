@@ -17,7 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from flask import Blueprint, jsonify, make_response, render_template, request, send_file
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
-from retirement import validate_plan, fetch_ledger, summarize
+from retirement import validate_plan, fetch_ledger, summarize, project_care
 
 PRIVATE_TAB = "__private_asset_status__"
 AUTH_TAB = "__private_asset_auth__"
@@ -372,7 +372,10 @@ def create_asset_blueprint(get_db, query):
         if not plan:
             return jsonify(initialized=False)
         ledger = fetch_ledger()
-        return jsonify(initialized=True, plan=plan, ledger=ledger, summary=summarize(plan, ledger))
+        summary = summarize(plan, ledger)
+        nursing = [r["amount"] for r in stored.get("expenses", []) if "요양" in r.get("description", "") and "1년" in r.get("description", "")]
+        projection = project_care(plan, ledger, summary, nursing[0] if len(nursing) == 1 else None)
+        return jsonify(initialized=True, plan=plan, ledger=ledger, summary=summary, projection=projection)
 
     @bp.route("/records", methods=["GET", "POST", "PUT"])
     @bp.post("/initial-import")

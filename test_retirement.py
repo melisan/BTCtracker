@@ -26,6 +26,36 @@ def plan():
 
 
 class ReconciliationTests(unittest.TestCase):
+    def test_projection_uses_fixed_care_and_completed_calendar_month_overhead(self):
+        p = plan()
+        rows = [
+            {"date":"2026-01-02", "amount":900, "spending_category":"요양원비"},
+            {"date":"2026-01-03", "amount":100, "spending_category":"의료·간병용품"},
+            {"date":"2026-03-01", "amount":200, "spending_category":"의복·생활용품"},
+            {"date":"2026-10-01", "amount":300, "spending_category":"기타·메모 확인"},
+            {"date":"2026-10-02", "amount":700, "spending_category":"정산·상환"},
+            {"date":"2026-10-02", "amount":800, "spending_category":"지원·포상"},
+            {"date":"2026-11-01", "amount":999, "spending_category":"의료·간병용품"},
+        ]
+        ledger={"rows":rows}
+        summary=retirement.summarize(p,ledger,"2026-11-02")
+        result=retirement.project_care(p,ledger,summary,1200)
+        self.assertEqual(result["history_months"],10)
+        self.assertEqual(result["monthly_nursing"],100)
+        self.assertEqual(result["monthly_overhead"],60)
+        self.assertEqual(result["monthly_total"],160)
+        self.assertIn("2026-05",result["missing_months"])
+        self.assertEqual(sum(r["total"] for r in result["overhead_categories"]),600)
+        self.assertEqual(result["funds"][1]["amount"],summary["liquid_projected"]+summary["bank_total"])
+
+    def test_projection_withholds_missing_history_or_configuration(self):
+        summary=retirement.summarize(plan(),{"rows":[]},"2026-11-02")
+        self.assertFalse(retirement.project_care(plan(),{"rows":None},summary,1200)["available"])
+        self.assertFalse(retirement.project_care(plan(),{"rows":[]},summary,1200)["available"])
+        rows=[{"date":"2026-11-01", "amount":100,"spending_category":"医療"}]
+        self.assertFalse(retirement.project_care(plan(),{"rows":rows},summary,1200)["available"])
+        self.assertFalse(retirement.project_care(plan(),{"rows":[]},summary,None)["available"])
+
     def test_maturity_moves_principal_into_liquidity_not_spending(self):
         ledger = {"rows": [{"date": "2026-11-02", "amount": 30}]}
         before = retirement.summarize(plan(), ledger, "2026-11-01")

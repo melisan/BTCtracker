@@ -157,3 +157,54 @@ def summarize(plan, ledger, today=None):
                   available_total=available, gap=available - current - major - minor,
                   liquid_projected=sum(r["amount"] for r in plan["holdings"] if r["kind"] == "liquid") - delta + recovery_delta)
     return result
+
+
+def project_care(plan, ledger, summary, annual_nursing):
+    """Fixed care bill plus observed overhead over completed calendar months."""
+    if ledger["rows"] is None or "liquid_projected" not in summary or annual_nursing is None:
+        return {"available": False, "reason": "가계부와 고정 요양비 설정을 확인한 후 전망을 계산합니다."}
+    amount(annual_nursing)
+    today = date.fromisoformat(summary["today"])
+    cutoff = today.replace(day=1).isoformat()
+    historical = [r for r in ledger["rows"] if r["date"] < cutoff]
+    if not historical:
+        return {"available": False, "reason": "완료된 월의 홍천지출 기록이 없어 월평균을 계산할 수 없습니다."}
+    first = min(r["date"] for r in historical)[:7]
+    start = date.fromisoformat(first + "-01")
+    months = (today.year - start.year) * 12 + today.month - start.month
+    excluded = {"요양원비", "정산·상환", "지원·포상"}
+    overhead = [r for r in historical if r["spending_category"] not in excluded]
+    groups = {}
+    for row in overhead:
+        key = row["spending_category"]
+        groups[key] = groups.get(key, 0) + abs(row["amount"])
+    monthly_overhead = sum(groups.values()) / months
+    monthly_nursing = annual_nursing / 12
+    monthly_total = monthly_nursing + monthly_overhead
+    if monthly_total <= 0:
+        return {"available": False, "reason": "고정 요양비를 설정해 주세요."}
+    btc = sum(r["amount"] for r in plan["holdings"] if r["kind"] == "btc")
+    housing = sum(r["amount"] for r in plan["holdings"] if r["kind"] == "housing")
+    cash = summary["liquid_projected"]
+    funds = [
+        {"label": "현재 유동자금만", "amount": cash, "kind": "liquid"},
+        {"label": "유동자금 + 남은 예금 원금", "amount": cash + summary["bank_total"], "kind": "bank"},
+        {"label": "예금 + 유동자금 + BTC 기록값", "amount": cash + summary["bank_total"] + btc, "kind": "btc"},
+        {"label": "전체 보유자산 · 보증금 포함", "amount": summary["holdings_total"], "kind": "all"},
+    ]
+    for row in funds:
+        row["months"] = max(0, row["amount"]) / monthly_total
+    observed = {r["date"][:7] for r in historical}
+    missing = []
+    for offset in range(months):
+        year, month = divmod(start.year * 12 + start.month - 1 + offset, 12)
+        key = f"{year:04d}-{month + 1:02d}"
+        if key not in observed:
+            missing.append(key)
+    return {"available": True, "history_start": first, "history_end_exclusive": cutoff,
+            "history_months": months, "missing_months": missing,
+            "monthly_nursing": monthly_nursing, "monthly_overhead": monthly_overhead,
+            "monthly_total": monthly_total, "annual_total": monthly_total * 12,
+            "overhead_categories": [{"label": key, "total": value, "monthly": value / months} for key, value in sorted(groups.items())],
+            "funds": funds, "housing": housing, "btc": btc,
+            "maturities": [{"date": r["maturity"], "amount": r["amount"]} for r in summary["holding_accounts"] if r.get("maturity")]}

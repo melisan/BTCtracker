@@ -2,6 +2,22 @@
 
 ## Retirement dashboard
 
+### Care-cost projection
+
+The projection uses the saved annual nursing-home budget divided by twelve as
+the fixed monthly bill. Medical and miscellaneous overhead is averaged across
+completed calendar months from the first recorded Hongcheon month. Current-month
+entries are excluded from the average. Missing months are listed explicitly and
+remain part of the calendar denominator. Nursing-home bills, reimbursements and
+support/awards are excluded from overhead; source-purpose totals remain expandable.
+
+Separate runway bars show liquid money, liquid money plus deposit principal,
+adding recorded BTC value, and finally including the housing deposit. No future
+interest, investment gain or inflation is assumed. Deposit maturity dates are
+checked against liquid funds in the interactive bank scenario. Additional monthly
+household use and the desired reserve period are local simulations, not writes to
+the asset plan or household ledger. The controls retain their values on refresh.
+
 The default view is the retirement reconciliation dashboard. Its plan is stored
 inside the existing encrypted asset document under `retirement`; personal amounts
 are initialized in production, never embedded in public source. Original accounts,
