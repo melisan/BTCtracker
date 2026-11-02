@@ -1,5 +1,34 @@
 # Asset status
 
+## Retirement dashboard
+
+The default view is the retirement reconciliation dashboard. Its plan is stored
+inside the existing encrypted asset document under `retirement`; personal amounts
+are initialized in production, never embedded in public source. Original accounts,
+the initial reconciliation baseline and recovery overrides are immutable after
+initialization. Older record clients preserve the plan when saving other fields.
+The original working document remains available in a collapsed archive.
+
+`GET /asset-status/retirement-summary` combines the plan with read-only ledger
+data fetched from the fixed household-finance transactions API. It includes all
+`hongcheon` transactions and Hongcheon category variants. Only dated transactions
+through today in Asia/Seoul count as actual payments. Source IDs, dates and memos
+are retained; purpose groups are inferred from memos, not changes to the ledger.
+Requests cache for one minute. Outages explicitly mark cached data stale; without
+cached data, spending, holdings and gap calculations are withheld rather than zeroed.
+
+At maturity on the Korean calendar, original deposits move from bank-held to
+recovered. This is a date-based classification, not bank confirmation. Recovery
+uses a recorded actual override where supplied; otherwise principal plus listed
+interest is an estimate. Recovered funds enter calculated liquidity, never spending.
+Holdings contain dated BTC valuations, housing deposits and liquid-account balances.
+Later Hongcheon spending reduces calculated liquidity once. Confirming fresh
+holdings establishes a new ledger/recovery snapshot without changing the original
+baseline. The dashboard distinguishes snapshot account values from calculated
+liquidity. Major payments and household transfers are separate from Hongcheon
+payments; reconciliation assumptions remain visible. No household ledger writes
+or database schema changes are used by the dashboard.
+
 ## Current access behavior
 
 The Asset status page opens saved records directly, without a password, setup

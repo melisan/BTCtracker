@@ -17,6 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from flask import Blueprint, jsonify, make_response, render_template, request, send_file
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
+from retirement import validate_plan, fetch_ledger, summarize
 
 PRIVATE_TAB = "__private_asset_status__"
 AUTH_TAB = "__private_asset_auth__"
@@ -78,6 +79,8 @@ def validate_document(data):
     if isinstance(reserve,bool) or not isinstance(reserve,(int,float)) or not math.isfinite(reserve) or not 0 <= reserve <= 9e15:
         raise ValueError("Invalid reserve amount")
     result["held_reserve_amount"] = reserve
+    if "retirement" in data:
+        result["retirement"] = validate_plan(data["retirement"])
     if len(result["other"]) > 100_000:
         raise ValueError("Too much text")
     ids = set()
@@ -352,6 +355,25 @@ def create_asset_blueprint(get_db, query):
         finally:
             conn.close()
 
+    @bp.get("/retirement-summary")
+    def retirement_summary():
+        cfg = config(include_auth=False)
+        if not cfg:
+            return jsonify(error="자산 현황의 저장 설정을 확인해 주세요."), 503
+        conn = get_db()
+        try:
+            row = query(conn, "SELECT content FROM tab_notes WHERE tab = %s ORDER BY id LIMIT 1", (PRIVATE_TAB,)).fetchone()
+            stored = json.loads(cfg[0].decrypt(row["content"].encode())) if row else {}
+            plan = stored.get("retirement")
+        except Exception:
+            return jsonify(error="저장된 내용을 열 수 없습니다."), 503
+        finally:
+            conn.close()
+        if not plan:
+            return jsonify(initialized=False)
+        ledger = fetch_ledger()
+        return jsonify(initialized=True, plan=plan, ledger=ledger, summary=summarize(plan, ledger))
+
     @bp.route("/records", methods=["GET", "POST", "PUT"])
     @bp.post("/initial-import")
     @bp.post("/initial-workbook")
@@ -387,6 +409,13 @@ def create_asset_blueprint(get_db, query):
             if request.method == "PUT" and (not stored or incoming.get("revision") != stored["revision"]):
                 return jsonify(error="다른 화면에서 내용이 변경되었습니다. 수정 내용을 확인한 뒤 다시 열어 주세요."), 409
             clean = validate_document(incoming)
+            # Older maintenance screens must not erase the retirement ledger.
+            if stored and "retirement" in stored:
+                previous = stored["retirement"]
+                if "retirement" not in incoming:
+                    clean["retirement"] = previous
+                elif any(clean["retirement"][key] != previous[key] for key in ("origin", "baseline", "recovery_overrides")):
+                    return jsonify(error="처음자산과 최초 대사 기준은 변경할 수 없습니다."), 409
             clean["revision"] = secrets.token_hex(16)
             clean["updated_at"] = datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
             encrypted = cfg[0].encrypt(json.dumps(clean, ensure_ascii=False).encode()).decode()
